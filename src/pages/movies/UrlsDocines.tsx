@@ -9,8 +9,10 @@ import {
 } from '../../services/api';
 import { DocinesMovieVideo, DocinesMovie } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS } from '../../lib/constants';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDocinesPeliculas() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -82,7 +84,7 @@ export default function UrlsDocinesPeliculas() {
         ? videos.filter(v => selectedVideos.includes(v.id)).map(v => v.url).join('\n')
         : videos.map(v => v.url).join('\n');
     await navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   const handleEdit = (video: DocinesMovieVideo) => {
@@ -115,7 +117,7 @@ export default function UrlsDocinesPeliculas() {
       setEditingId(null);
       setEditForm({});
     } catch {
-      alert('Error al actualizar el enlace');
+      showSnackbar('Error al actualizar el enlace', 'error');
     }
   };
 
@@ -130,11 +132,10 @@ export default function UrlsDocinesPeliculas() {
           setVideos(prev => prev.filter(v => v.id !== videoId));
           setSelectedVideos(prev => prev.filter(id => id !== videoId));
           if (editingId === videoId) {
-            setEditingId(null);
             setEditForm({});
           }
         } catch {
-          alert('Error al eliminar el enlace');
+          showSnackbar('Error al eliminar el enlace', 'error');
         }
       }
     });
@@ -155,7 +156,7 @@ export default function UrlsDocinesPeliculas() {
           setEditingId(null);
           setEditForm({});
         } catch {
-          alert('Error al eliminar algunos enlaces');
+          showSnackbar('Error al eliminar algunos enlaces', 'error');
         }
       }
     });

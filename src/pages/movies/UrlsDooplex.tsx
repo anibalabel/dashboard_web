@@ -9,8 +9,10 @@ import {
 } from '../../services/api';
 import { DooplexMovieVideo, DooplexMovie } from '../../types';
 import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDooplexPeliculas() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -90,7 +92,7 @@ export default function UrlsDooplexPeliculas() {
         ? videos.filter(v => selectedVideos.includes(v.id)).map(v => v.link).join('\n')
         : videos.map(v => v.link).join('\n');
     await navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   const handleEdit = (video: DooplexMovieVideo) => {
@@ -131,7 +133,7 @@ export default function UrlsDooplexPeliculas() {
       setEditingId(null);
       setEditForm({});
     } catch {
-      alert('Error al actualizar el video');
+      showSnackbar('Error al actualizar el video', 'error');
     }
   };
 
@@ -146,11 +148,10 @@ export default function UrlsDooplexPeliculas() {
           setVideos(prev => prev.filter(v => v.id !== videoId));
           setSelectedVideos(prev => prev.filter(id => id !== videoId));
           if (editingId === videoId) {
-            setEditingId(null);
             setEditForm({});
           }
         } catch {
-          alert('Error al eliminar el video');
+          showSnackbar('Error al eliminar el video', 'error');
         }
       }
     });
@@ -171,7 +172,7 @@ export default function UrlsDooplexPeliculas() {
           setEditingId(null);
           setEditForm({});
         } catch {
-          alert('Error al eliminar algunos videos');
+          showSnackbar('Error al eliminar algunos videos', 'error');
         }
       }
     });

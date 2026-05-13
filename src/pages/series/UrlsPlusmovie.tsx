@@ -9,8 +9,10 @@ import {
   updatePlusmovieEpisode
 } from '../../services/api';
 import { PlusmovieEpisode, PlusmovieSeason, PlusmovieSerie } from '../../types';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsPlusmovie() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -104,7 +106,7 @@ export default function UrlsPlusmovie() {
         ? episodes.filter(e => selectedEpisodes.includes(e.episodes_id)).map(e => e.file_url).join('\n')
         : episodes.map(e => e.file_url).join('\n');
     await navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   const handleEdit = (episode: PlusmovieEpisode) => {
@@ -136,7 +138,7 @@ export default function UrlsPlusmovie() {
       setEditingId(null);
       setEditForm({});
     } catch {
-      alert('Error al actualizar el episodio');
+      showSnackbar('Error al actualizar el episodio', 'error');
     }
   };
 
@@ -151,11 +153,10 @@ export default function UrlsPlusmovie() {
           setEpisodes(prev => prev.filter(ep => ep.episodes_id !== episodesId));
           setSelectedEpisodes(prev => prev.filter(id => id !== episodesId));
           if (editingId === episodesId) {
-            setEditingId(null);
             setEditForm({});
           }
         } catch {
-          alert('Error al eliminar el episodio');
+          showSnackbar('Error al eliminar el episodio', 'error');
         }
       }
     });
@@ -176,7 +177,7 @@ export default function UrlsPlusmovie() {
           setEditingId(null);
           setEditForm({});
         } catch {
-          alert('Error al eliminar algunos episodios');
+          showSnackbar('Error al eliminar algunos episodios', 'error');
         }
       }
     });
@@ -360,7 +361,7 @@ export default function UrlsPlusmovie() {
                               <button
                                 onClick={() => {
                                   navigator.clipboard.writeText(episode.file_url);
-                                  alert('URL copiada');
+                                  showSnackbar('URL copiada', 'success');
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold transition-colors"
                                 type="button"

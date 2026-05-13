@@ -9,8 +9,10 @@ import {
 } from '../../services/api';
 import { PlusmovieMovieVideo, PlusmovieMovie } from '../../types';
 import { LANG_OPTIONS } from '../../lib/constants';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsPlusmoviePeliculas() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -82,7 +84,7 @@ export default function UrlsPlusmoviePeliculas() {
         ? videos.filter(v => selectedVideos.includes(v.video_file_id)).map(v => v.file_url).join('\n')
         : videos.map(v => v.file_url).join('\n');
     await navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   const handleEdit = (video: PlusmovieMovieVideo) => {
@@ -114,7 +116,7 @@ export default function UrlsPlusmoviePeliculas() {
       setEditingId(null);
       setEditForm({});
     } catch {
-      alert('Error al actualizar el video');
+      showSnackbar('Error al actualizar el video', 'error');
     }
   };
 
@@ -129,11 +131,10 @@ export default function UrlsPlusmoviePeliculas() {
           setVideos(prev => prev.filter(v => v.video_file_id !== videoId));
           setSelectedVideos(prev => prev.filter(id => id !== videoId));
           if (editingId === videoId) {
-            setEditingId(null);
             setEditForm({});
           }
         } catch {
-          alert('Error al eliminar el video');
+          showSnackbar('Error al eliminar el video', 'error');
         }
       }
     });
@@ -154,7 +155,7 @@ export default function UrlsPlusmoviePeliculas() {
           setEditingId(null);
           setEditForm({});
         } catch {
-          alert('Error al eliminar algunos videos');
+          showSnackbar('Error al eliminar algunos videos', 'error');
         }
       }
     });
