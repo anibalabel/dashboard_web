@@ -83,8 +83,11 @@ export default function UrlsDocinesUpdate() {
   const handleUpdateDocinesEpisodesMetadata = async () => {
     if (!tmdbId || !selectedSeason) return;
 
-    const selectedSeasonObj = seasons.find(s => s.id === Number(selectedSeason));
-    if (!selectedSeasonObj) return;
+    const selectedSeasonObj = seasons.find(s => Number(s.id) === Number(selectedSeason));
+    if (!selectedSeasonObj) {
+      alert(`No se encontró la temporada seleccionada en la lista de Docines. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`);
+      return;
+    }
 
     setIsUpdatingTmdbMetadata(true);
 
@@ -116,7 +119,7 @@ export default function UrlsDocinesUpdate() {
       let updatedCount = 0;
       for (let i = 0; i < tmdbEpisodes.length; i++) {
         const tmdbEp = tmdbEpisodes[i];
-        const localEp = episodes.find(e => e.episoade_order === tmdbEp.episode_number);
+        const localEp = episodes.find(e => Number(e.episoade_order) === Number(tmdbEp.episode_number));
 
         if (!localEp) {
           setProgress(prev => ({

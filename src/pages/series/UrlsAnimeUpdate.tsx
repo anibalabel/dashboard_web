@@ -79,8 +79,11 @@ export default function UrlsAnimeUpdate() {
   const handleUpdateAnimeEpisodesMetadata = async () => {
     if (!tmdbId || !selectedSeason) return;
 
-    const selectedSeasonObj = seasons.find((s) => s.id === Number(selectedSeason));
-    if (!selectedSeasonObj) return;
+    const selectedSeasonObj = seasons.find((s) => Number(s.id) === Number(selectedSeason));
+    if (!selectedSeasonObj) {
+      alert(`No se encontró la temporada seleccionada en la lista de Anime. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`);
+      return;
+    }
 
     setIsUpdatingTmdbMetadata(true);
 
@@ -112,7 +115,7 @@ export default function UrlsAnimeUpdate() {
       let updatedCount = 0;
       for (let i = 0; i < tmdbEpisodes.length; i++) {
         const tmdbEp = tmdbEpisodes[i];
-        const localEp = episodes.find((e) => e.episode_number === tmdbEp.episode_number);
+        const localEp = episodes.find((e) => Number(e.episode_number) === Number(tmdbEp.episode_number));
 
         if (!localEp) {
           setProgress((prev) => ({

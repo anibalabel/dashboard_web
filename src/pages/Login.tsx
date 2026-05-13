@@ -78,6 +78,13 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
                   placeholder="admin@demo.com"
+                  enterKeyHint="next"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      document.getElementById('password')?.focus();
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -112,6 +119,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-10 sm:text-sm border-gray-300 rounded-md py-2 border"
                   placeholder="••••••"
+                  enterKeyHint="go"
                 />
               </div>
             </div>

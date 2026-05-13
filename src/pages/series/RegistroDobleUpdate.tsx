@@ -32,7 +32,7 @@ export default function RegistroDobleUpdate() {
   const [plusmovieSeries, setPlusmovieSeries] = useState<PlusmovieSerie | null>(null);
   const [plusmovieCandidates, setPlusmovieCandidates] = useState<PlusmovieSerie[]>([]);
   const [isUpdatingTmdb, setIsUpdatingTmdb] = useState<number | null>(null);
-  
+
   // Manual Search State
   const [manualVideosId, setManualVideosId] = useState('');
   const [isSearchingManual, setIsSearchingManual] = useState(false);
@@ -40,7 +40,7 @@ export default function RegistroDobleUpdate() {
   // Seasons Data
   const [dooplexSeasons, setDooplexSeasons] = useState<DooplexSeason[]>([]);
   const [plusmovieSeasons, setPlusmovieSeasons] = useState<PlusmovieSeason[]>([]);
-  
+
   // Selected Seasons
   const [selectedDooplexSeason, setSelectedDooplexSeason] = useState<number | ''>('');
   const [selectedPlusmovieSeason, setSelectedPlusmovieSeason] = useState<number | ''>('');
@@ -60,22 +60,22 @@ export default function RegistroDobleUpdate() {
   const handleUpdateTmdb = async (candidate: PlusmovieSerie) => {
     if (!tmdbId) return;
     setIsUpdatingTmdb(candidate.videos_id);
-    
+
     // Prefer Dooplex name to ensure consistency
     const titleToUse = dooplexSeries ? dooplexSeries.name : candidate.title;
-    
+
     try {
       await updatePlusmovieSerie({
         videos_id: candidate.videos_id,
         title: titleToUse,
         tmdbid: Number(tmdbId)
       });
-      
+
       setPlusmovieSeries({ ...candidate, title: titleToUse, tmdbid: Number(tmdbId) });
       setPlusmovieCandidates([]);
       // Remove specific error message if present
       setError(prev => prev.replace('No se encontró la serie en Plusmovie.', '').trim());
-      
+
       const seasonsRes = await getPlusmovieSeasons(candidate.videos_id);
       setPlusmovieSeasons(seasonsRes.data || []);
     } catch (err) {
@@ -90,7 +90,7 @@ export default function RegistroDobleUpdate() {
     if (!manualVideosId) return;
     setIsSearchingManual(true);
     setPlusmovieCandidates([]); // Clear previous candidates
-    
+
     try {
       const res = await getPlusmovieSeriesByVideosId(Number(manualVideosId));
       if (res.data && res.data.length > 0) {
@@ -158,7 +158,7 @@ export default function RegistroDobleUpdate() {
             console.error("Error searching by title in Plusmovie", err);
           }
         }
-        
+
         if (!foundCandidate) {
           setError(prev => prev ? `${prev} No se encontró la serie en Plusmovie.` : 'No se encontró la serie en Plusmovie.');
         }
@@ -199,14 +199,21 @@ export default function RegistroDobleUpdate() {
   }, [selectedPlusmovieSeason]);
 
   const handleUpdateDooplexEpisodesMetadata = async () => {
-    if (!tmdbId || !selectedDooplexSeason) return;
-    
+    if (!tmdbId || !selectedDooplexSeason) {
+      alert(`Falta información: tmdbId=${tmdbId}, selectedDooplexSeason=${selectedDooplexSeason}`);
+      return;
+    }
+
     // Find the season number from the selected season ID
-    const selectedSeasonObj = dooplexSeasons.find(s => s.id === Number(selectedDooplexSeason));
-    if (!selectedSeasonObj) return;
+    const selectedSeasonObj = dooplexSeasons.find(s => Number(s.id) === Number(selectedDooplexSeason));
     
+    if (!selectedSeasonObj) {
+      alert(`No se encontró la temporada seleccionada en la lista de Dooplex. IDs disponibles: ${dooplexSeasons.map(s => s.id).join(', ')}`);
+      return;
+    }
+
     setIsUpdatingTmdbMetadata(true);
-    
+
     try {
       // 1. Fetch metadata from TMDB using the Bearer token authorization
       const options = {
@@ -218,22 +225,22 @@ export default function RegistroDobleUpdate() {
       };
 
       const tmdbRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${selectedSeasonObj.season_number}?language=es-ES`, options);
-      
+
       if (!tmdbRes.ok) {
         throw new Error('Error al obtener datos de TMDB');
       }
-      
+
       const tmdbData = await tmdbRes.json();
-      
+
       // 2. Map and update Dooplex and Plusmovie episodes
       let updatedCount = 0;
       setProgress({ total: tmdbData.episodes.length, current: 0, logs: [] });
 
       for (let i = 0; i < tmdbData.episodes.length; i++) {
         const tmdbEp = tmdbData.episodes[i];
-        
+
         // 2.1 Update Dooplex episode
-        const localEp = dooplexEpisodes.find(e => e.episode_number === tmdbEp.episode_number);
+        const localEp = dooplexEpisodes.find(e => Number(e.episode_number) === Number(tmdbEp.episode_number));
         if (localEp) {
           try {
             await updateDooplexEpisode({
@@ -258,62 +265,62 @@ export default function RegistroDobleUpdate() {
             }));
           }
         } else {
-            setProgress(prev => ({
-              ...prev,
-              current: i + 1,
-              logs: [{ msg: `[Dooplex] Episodio ${tmdbEp.episode_number} ignorado (no existe localmente).`, isError: false }, ...prev.logs]
-            }));
+          setProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            logs: [{ msg: `[Dooplex] Episodio ${tmdbEp.episode_number} ignorado (no existe localmente).`, isError: false }, ...prev.logs]
+          }));
         }
 
         // 2.2 Update Plusmovie episode (Only the title)
         if (selectedPlusmovieSeason) {
-           // Plusmovie uses 'order' which typically corresponds to the episode number
-           const pmEp = plusmovieEpisodes.find(e => e.order === tmdbEp.episode_number);
-           if (pmEp) {
-             try {
-                // Formatting name as "1 - Piloto (Editado)"
-                const pmTitle = `${tmdbEp.episode_number} - ${tmdbEp.name || `Episodio ${tmdbEp.episode_number}`}`;
-                await updatePlusmovieEpisode({
-                  episodes_id: pmEp.episodes_id,
-                  episodes_name: pmTitle,
-                  // Keep existing URL and order
-                  file_url: pmEp.file_url,
-                  order: pmEp.order
-                });
-                setProgress(prev => ({
-                  ...prev,
-                  logs: [{ msg: `[Plusmovie] Episodio ${tmdbEp.episode_number} título actualizado.`, isError: false }, ...prev.logs]
-                }));
-             } catch (err) {
-                console.error(`Error actualizando episodio Plusmovie ${pmEp.order}:`, err);
-                setProgress(prev => ({
-                  ...prev,
-                  logs: [{ msg: `[Plusmovie] Error al actualizar título del Episodio ${tmdbEp.episode_number}.`, isError: true }, ...prev.logs]
-                }));
-             }
-           } else {
+          // Plusmovie uses 'order' which typically corresponds to the episode number
+          const pmEp = plusmovieEpisodes.find(e => Number(e.order) === Number(tmdbEp.episode_number));
+          if (pmEp) {
+            try {
+              // Formatting name as "1 - Piloto (Editado)"
+              const pmTitle = `${tmdbEp.episode_number} - ${tmdbEp.name || `Episodio ${tmdbEp.episode_number}`}`;
+              await updatePlusmovieEpisode({
+                episodes_id: pmEp.episodes_id,
+                episodes_name: pmTitle,
+                // Keep existing URL and order
+                file_url: pmEp.file_url,
+                order: pmEp.order
+              });
               setProgress(prev => ({
                 ...prev,
-                logs: [{ msg: `[Plusmovie] Episodio ${tmdbEp.episode_number} ignorado (no existe en Plusmovie).`, isError: false }, ...prev.logs]
+                logs: [{ msg: `[Plusmovie] Episodio ${tmdbEp.episode_number} título actualizado.`, isError: false }, ...prev.logs]
               }));
-           }
+            } catch (err) {
+              console.error(`Error actualizando episodio Plusmovie ${pmEp.order}:`, err);
+              setProgress(prev => ({
+                ...prev,
+                logs: [{ msg: `[Plusmovie] Error al actualizar título del Episodio ${tmdbEp.episode_number}.`, isError: true }, ...prev.logs]
+              }));
+            }
+          } else {
+            setProgress(prev => ({
+              ...prev,
+              logs: [{ msg: `[Plusmovie] Episodio ${tmdbEp.episode_number} ignorado (no existe en Plusmovie).`, isError: false }, ...prev.logs]
+            }));
+          }
         }
       }
-      
+
       // 3. Refresh episodes list to show new names
       const resDooplex = await getDooplexEpisodes(Number(selectedDooplexSeason));
       setDooplexEpisodes(resDooplex.data || []);
 
       if (selectedPlusmovieSeason) {
-         const resPlusmovie = await getPlusmovieEpisodes(Number(selectedPlusmovieSeason));
-         setPlusmovieEpisodes(resPlusmovie.data || []);
+        const resPlusmovie = await getPlusmovieEpisodes(Number(selectedPlusmovieSeason));
+        setPlusmovieEpisodes(resPlusmovie.data || []);
       }
-      
+
       setProgress(prev => ({
         ...prev,
         logs: [{ msg: `Se actualizaron exitosamente ${updatedCount} episodios.`, isError: false }, ...prev.logs]
       }));
-      
+
     } catch (err) {
       console.error(err);
       setProgress(prev => ({
@@ -425,7 +432,7 @@ export default function RegistroDobleUpdate() {
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Datos de la Serie</h2>
-              
+
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <span className="block text-sm text-gray-500">Dooplex</span>
@@ -481,13 +488,14 @@ export default function RegistroDobleUpdate() {
           {/* Right Column: Submit and Progress */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Actualizar Episodios</h2>
-            
+
             <div className="flex-1 flex flex-col">
               <p className="text-sm text-gray-500 mt-2 mb-4">
                 Se sincronizarán los títulos, descripciones e imágenes de todos los episodios de la temporada seleccionada de Dooplex utilizando la información de TMDB.
               </p>
 
               <button
+                type="button"
                 onClick={handleUpdateDooplexEpisodesMetadata}
                 disabled={isUpdatingTmdbMetadata || !selectedDooplexSeason}
                 className="w-full mt-4 bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
@@ -506,15 +514,15 @@ export default function RegistroDobleUpdate() {
               </button>
             </div>
 
-            {(progress.total > 0 || isUpdatingTmdbMetadata) && (
+            {(progress.total > 0 || progress.logs.length > 0 || isUpdatingTmdbMetadata) && (
               <div className="mt-6 bg-gray-50 rounded-lg border border-gray-200 p-4">
                 <h3 className="font-medium text-gray-900 mb-2 flex justify-between">
                   <span>Progreso</span>
                   <span>{progress.current} / {progress.total}</span>
                 </h3>
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: progress.total > 0 ? `${(progress.current / progress.total) * 100}%` : '0%' }}
                   ></div>
                 </div>
