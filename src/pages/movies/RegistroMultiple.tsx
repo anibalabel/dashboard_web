@@ -17,7 +17,7 @@ import {
   DooplexMovie,
   DocinesMovie
 } from '../../types';
-import { QUALITY_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS } from '../../lib/constants';
+import { QUALITY_OPTIONS, SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function RegistroMultiplePeliculas() {
   const [tmdbId, setTmdbId] = useState('');
@@ -57,15 +57,11 @@ export default function RegistroMultiplePeliculas() {
     setDocinesLang(newLang);
   };
 
-  const handleGlobalQualityChange = (newQuality: string) => {
-    setDooplexQuality(newQuality);
-    setDocinesQuality(newQuality);
-  };
-
   const handleGlobalHeaderChange = (newHeader: string) => {
     setPlusmovieHeader(newHeader);
     setDooplexHeader(newHeader);
     setDocinesHeader(newHeader);
+    if (newHeader) setDooplexQuality(newHeader);
   };
 
   // Form Data - Plusmovie
@@ -76,6 +72,7 @@ export default function RegistroMultiplePeliculas() {
   const [dooplexQuality, setDooplexQuality] = useState('1080P');
   const [dooplexHeader, setDooplexHeader] = useState('');
   const [dooplexLang, setDooplexLang] = useState('LAT');
+  const [dooplexSource, setDooplexSource] = useState('embed');
 
   // Form Data - Docines
   const [docinesLang, setDocinesLang] = useState('LAT');
@@ -286,12 +283,20 @@ export default function RegistroMultiplePeliculas() {
       // Dooplex Registration
       if (useDooplex && dooplexData) {
         try {
+          const sourceFlags = {
+            embed: dooplexSource === 'embed' ? '1' : '0',
+            youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
+            hls: dooplexSource === 'hls' ? '1' : '0',
+            supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
+          };
+
           await registerDooplexMovie({
             movie_id: dooplexData.id,
             server: dooplexQuality,
             header: dooplexHeader,
             link: currentUrl,
-            lang: dooplexLang
+            lang: dooplexLang,
+            ...sourceFlags
           });
           setProgress(prev => ({
             ...prev,
@@ -546,10 +551,10 @@ export default function RegistroMultiplePeliculas() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Calidad</label>
                   <select
                     value={dooplexQuality}
-                    onChange={(e) => handleGlobalQualityChange(e.target.value)}
+                    onChange={(e) => setDooplexQuality(e.target.value)}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                   >
-                    {QUALITY_OPTIONS.map((opt) => (
+                    {SERVER_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
@@ -577,6 +582,18 @@ export default function RegistroMultiplePeliculas() {
                   >
                     {LANG_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <select
+                    value={dooplexSource}
+                    onChange={(e) => setDooplexSource(e.target.value)}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
+                  >
+                    {SOURCE_OPTIONS.map((opt) => (
+                      <option key={opt.label} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
@@ -632,7 +649,7 @@ export default function RegistroMultiplePeliculas() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Calidad</label>
                     <select
                       value={docinesQuality}
-                      onChange={(e) => handleGlobalQualityChange(e.target.value)}
+                    onChange={(e) => setDocinesQuality(e.target.value)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                     >
                       {QUALITY_OPTIONS.map((opt) => (

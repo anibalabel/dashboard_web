@@ -78,9 +78,18 @@ export default function RegistroDocines() {
       if (selectedDocinesSeason) {
         try {
           const res = await getDocinesEpisodes(Number(selectedDocinesSeason));
-          setDocinesEpisodes(res.data || []);
-          if (res.data && res.data.length > 0) {
-            setSelectedStartEpisodeId(res.data[0].id);
+          const normalizedEpisodes = (res.data || [])
+            .map((ep) => ({
+              ...ep,
+              id: Number(ep.id),
+              season_id: Number(ep.season_id),
+              episoade_order: Number(ep.episoade_order)
+            }))
+            .sort((a, b) => a.episoade_order - b.episoade_order);
+
+          setDocinesEpisodes(normalizedEpisodes);
+          if (normalizedEpisodes.length > 0) {
+            setSelectedStartEpisodeId(normalizedEpisodes[0].id);
           } else {
             setSelectedStartEpisodeId('');
           }
@@ -105,6 +114,38 @@ export default function RegistroDocines() {
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
     const startIndex = docinesEpisodes.findIndex(ep => ep.id === Number(selectedStartEpisodeId));
+    if (docinesEpisodes.length === 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: no hay episodios cargados para la temporada seleccionada.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    if (startIndex < 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: el episodio inicial seleccionado no se encontró en la lista de episodios cargada. Vuelve a seleccionar la temporada/episodio.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    const availableFromStart = docinesEpisodes.length - startIndex;
+    if (availableFromStart < urlList.length) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [
+          {
+            msg: `Aviso: solo hay ${availableFromStart} episodios disponibles desde el episodio inicial seleccionado. Se intentarán registrar ${availableFromStart} de ${urlList.length} URLs.`,
+            isError: true
+          },
+          ...prev.logs
+        ]
+      }));
+    }
+
     let currentIndex = startIndex;
 
     for (let i = 0; i < urlList.length; i++) {

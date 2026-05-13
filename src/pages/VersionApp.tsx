@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Download, Loader2, RefreshCw, Save, Upload } from 'lucide-react';
 import { isValidStreamNexusVersion, validateStreamNexusVersionFile } from '@/lib/versioning';
 
@@ -22,6 +22,8 @@ export default function VersionApp() {
   const [apkUploading, setApkUploading] = useState(false);
   const [apkError, setApkError] = useState<string | null>(null);
   const [apkOk, setApkOk] = useState<string | null>(null);
+  const [apkDragOver, setApkDragOver] = useState(false);
+  const apkInputRef = useRef<HTMLInputElement | null>(null);
 
   const [versionLoading, setVersionLoading] = useState(false);
   const [versionSaving, setVersionSaving] = useState(false);
@@ -29,6 +31,25 @@ export default function VersionApp() {
   const [versionOk, setVersionOk] = useState<string | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [nextVersion, setNextVersion] = useState<string>('');
+
+  const setApkCandidate = (file: File | null) => {
+    setApkError(null);
+    setApkOk(null);
+
+    if (!file) {
+      setApkFile(null);
+      return;
+    }
+
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.apk')) {
+      setApkFile(null);
+      setApkError('El archivo debe ser un .apk');
+      return;
+    }
+
+    setApkFile(file);
+  };
 
   const loadVersion = async () => {
     setVersionLoading(true);
@@ -175,16 +196,50 @@ export default function VersionApp() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">Archivo APK</label>
-              <input
-                type="file"
-                accept=".apk"
-                onChange={(e) => {
-                  setApkError(null);
-                  setApkOk(null);
-                  setApkFile(e.target.files?.[0] || null);
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => apkInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    apkInputRef.current?.click();
+                  }
                 }}
-                className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-              />
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  setApkDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setApkDragOver(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setApkDragOver(false);
+                  const file = e.dataTransfer.files?.[0] || null;
+                  setApkCandidate(file);
+                }}
+                className={`flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed p-6 text-sm transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 ${
+                  apkDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Upload className="h-4 w-4" />
+                  <span>Arrastra y suelta el APK aquí, o haz clic para seleccionarlo</span>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  {apkFile ? `Seleccionado: ${apkFile.name}` : 'Solo archivos .apk'}
+                </div>
+                <input
+                  ref={apkInputRef}
+                  type="file"
+                  accept=".apk"
+                  onChange={(e) => setApkCandidate(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+              </div>
               <p className="mt-2 text-xs text-gray-500">
                 Se guardará como app-streamnexus.apk
               </p>

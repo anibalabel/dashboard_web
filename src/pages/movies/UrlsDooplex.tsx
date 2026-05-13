@@ -8,7 +8,7 @@ import {
   updateDooplexMovieVideo
 } from '../../services/api';
 import { DooplexMovieVideo, DooplexMovie } from '../../types';
-import { QUALITY_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function UrlsDooplexPeliculas() {
   const [tmdbId, setTmdbId] = useState('');
@@ -37,6 +37,14 @@ export default function UrlsDooplexPeliculas() {
   const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   const allVideoIds = useMemo(() => videos.map(v => v.id), [videos]);
+
+  const resolveSourceValue = (video: Partial<DooplexMovieVideo>) => {
+    if (Number(video.embed) === 1) return 'embed';
+    if (Number(video.youtubelink) === 1) return 'youtubelink';
+    if (Number(video.hls) === 1) return 'hls';
+    if (Number(video.supported_hosts) === 1) return 'supported_hosts';
+    return 'embed';
+  };
 
   const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -87,7 +95,14 @@ export default function UrlsDooplexPeliculas() {
 
   const handleEdit = (video: DooplexMovieVideo) => {
     setEditingId(video.id);
-    setEditForm({ ...video });
+    const source = resolveSourceValue(video);
+    setEditForm({
+      ...video,
+      embed: source === 'embed' ? '1' : '0',
+      youtubelink: source === 'youtubelink' ? '1' : '0',
+      hls: source === 'hls' ? '1' : '0',
+      supported_hosts: source === 'supported_hosts' ? '1' : '0'
+    });
   };
 
   const handleCancelEdit = () => {
@@ -103,7 +118,11 @@ export default function UrlsDooplexPeliculas() {
         server: editForm.server,
         header: editForm.header,
         link: editForm.link,
-        lang: editForm.lang
+        lang: editForm.lang,
+        embed: editForm.embed,
+        youtubelink: editForm.youtubelink,
+        hls: editForm.hls,
+        supported_hosts: editForm.supported_hosts
       });
 
       setVideos(prev =>
@@ -245,7 +264,7 @@ export default function UrlsDooplexPeliculas() {
                   >
                     {isEditing ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">Calidad (Server)</label>
                             <select
@@ -253,7 +272,7 @@ export default function UrlsDooplexPeliculas() {
                               onChange={(e) => setEditForm({ ...editForm, server: e.target.value })}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >
-                              {QUALITY_OPTIONS.map((opt) => (
+                              {SERVER_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
@@ -262,7 +281,10 @@ export default function UrlsDooplexPeliculas() {
                             <label className="block text-xs font-medium text-gray-500 mb-1">Header</label>
                             <select
                               value={editForm.header || ''}
-                              onChange={(e) => setEditForm({ ...editForm, header: e.target.value })}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                              }}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >
                               {HEADER_OPTIONS.map((opt) => (
@@ -279,6 +301,27 @@ export default function UrlsDooplexPeliculas() {
                             >
                               {LANG_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Source</label>
+                            <select
+                              value={resolveSourceValue(editForm)}
+                              onChange={(e) => {
+                                const source = e.target.value;
+                                setEditForm({
+                                  ...editForm,
+                                  embed: source === 'embed' ? '1' : '0',
+                                  youtubelink: source === 'youtubelink' ? '1' : '0',
+                                  hls: source === 'hls' ? '1' : '0',
+                                  supported_hosts: source === 'supported_hosts' ? '1' : '0'
+                                });
+                              }}
+                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
+                            >
+                              {SOURCE_OPTIONS.map((opt) => (
+                                <option key={opt.label} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
                           </div>

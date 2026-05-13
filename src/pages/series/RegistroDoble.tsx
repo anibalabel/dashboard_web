@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, PlayCircle, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import {
   getDooplexSeries,
@@ -19,9 +20,11 @@ import {
   PlusmovieSerie,
   PlusmovieSeason
 } from '../../types';
-import { QUALITY_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function RegistroDoble() {
+  const location = useLocation();
+  const isPlusmovieOnly = new URLSearchParams(location.search).get('mode') === 'plusmovie';
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -53,6 +56,7 @@ export default function RegistroDoble() {
   const [dooplexQuality, setDooplexQuality] = useState('1080P');
   const [dooplexHeader, setDooplexHeader] = useState('');
   const [dooplexLang, setDooplexLang] = useState('CAST');
+  const [dooplexSource, setDooplexSource] = useState('embed');
 
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
@@ -181,9 +185,18 @@ export default function RegistroDoble() {
       if (selectedDooplexSeason) {
         try {
           const res = await getDooplexEpisodes(Number(selectedDooplexSeason));
-          setDooplexEpisodes(res.data || []);
-          if (res.data && res.data.length > 0) {
-            setSelectedStartEpisodeId(res.data[0].id);
+          const normalizedEpisodes = (res.data || [])
+            .map((ep) => ({
+              ...ep,
+              id: Number(ep.id),
+              season_id: Number(ep.season_id),
+              episode_number: Number(ep.episode_number)
+            }))
+            .sort((a, b) => a.episode_number - b.episode_number);
+
+          setDooplexEpisodes(normalizedEpisodes);
+          if (normalizedEpisodes.length > 0) {
+            setSelectedStartEpisodeId(normalizedEpisodes[0].id);
           } else {
             setSelectedStartEpisodeId('');
           }
@@ -208,6 +221,38 @@ export default function RegistroDoble() {
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
     const startIndex = dooplexEpisodes.findIndex(ep => ep.id === Number(selectedStartEpisodeId));
+    if (dooplexEpisodes.length === 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: no hay episodios cargados para la temporada de Dooplex seleccionada.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    if (startIndex < 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: el episodio inicial seleccionado no se encontró en la lista de episodios cargada. Vuelve a seleccionar la temporada/episodio.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    const availableFromStart = dooplexEpisodes.length - startIndex;
+    if (availableFromStart < urlList.length) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [
+          {
+            msg: `Aviso: solo hay ${availableFromStart} episodios disponibles desde el episodio inicial seleccionado. Se intentarán registrar ${availableFromStart} de ${urlList.length} URLs.`,
+            isError: true
+          },
+          ...prev.logs
+        ]
+      }));
+    }
+
     let currentIndex = startIndex;
 
     for (let i = 0; i < urlList.length; i++) {
@@ -222,24 +267,33 @@ export default function RegistroDoble() {
         break;
       }
 
-      // Dooplex Registration
-      try {
-        await registerDooplexLink({
-          episode_id: currentEpisode.id,
-          server: dooplexQuality,
-          header: dooplexHeader,
-          link: currentUrl,
-          lang: dooplexLang
-        });
-        setProgress(prev => ({
-          ...prev,
-          logs: [{ msg: `[Dooplex] Episodio ${currentEpisode.episode_number} registrado.`, isError: false }, ...prev.logs]
-        }));
-      } catch {
-        setProgress(prev => ({
-          ...prev,
-          logs: [{ msg: `[Dooplex] Error al registrar Episodio ${currentEpisode.episode_number}.`, isError: true }, ...prev.logs]
-        }));
+      if (!isPlusmovieOnly) {
+        try {
+          const sourceFlags = {
+            embed: dooplexSource === 'embed' ? '1' : '0',
+            youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
+            hls: dooplexSource === 'hls' ? '1' : '0',
+            supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
+          };
+
+          await registerDooplexLink({
+            episode_id: currentEpisode.id,
+            server: dooplexQuality,
+            header: dooplexHeader,
+            link: currentUrl,
+            lang: dooplexLang,
+            ...sourceFlags
+          });
+          setProgress(prev => ({
+            ...prev,
+            logs: [{ msg: `[Dooplex] Episodio ${currentEpisode.episode_number} registrado.`, isError: false }, ...prev.logs]
+          }));
+        } catch {
+          setProgress(prev => ({
+            ...prev,
+            logs: [{ msg: `[Dooplex] Error al registrar Episodio ${currentEpisode.episode_number}.`, isError: true }, ...prev.logs]
+          }));
+        }
       }
 
       // Plusmovie Registration
@@ -275,7 +329,9 @@ export default function RegistroDoble() {
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8 flex items-center gap-3">
         <PlayCircle className="h-8 w-8 text-blue-600" />
-        <h1 className="text-3xl font-bold text-gray-900">Registro Dual (Dooplex + Plusmovie)</h1>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {isPlusmovieOnly ? 'Registro Series Plusmovie' : 'Registro Dual (Dooplex + Plusmovie)'}
+        </h1>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -435,47 +491,65 @@ export default function RegistroDoble() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Metadatos Dooplex</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Calidad (Server)</label>
-                  <select
-                    value={dooplexQuality}
-                    onChange={(e) => setDooplexQuality(e.target.value)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                  >
-                    {QUALITY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
-                  <select
-                    value={dooplexHeader}
-                    onChange={(e) => setDooplexHeader(e.target.value)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                  >
-                    {HEADER_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Idioma (Lang)</label>
-                  <select
-                    value={dooplexLang}
-                    onChange={(e) => setDooplexLang(e.target.value)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                  >
-                    {LANG_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+            {!isPlusmovieOnly && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Metadatos Dooplex</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Calidad (Server)</label>
+                    <select
+                      value={dooplexQuality}
+                      onChange={(e) => setDooplexQuality(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                    >
+                      {SERVER_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
+                    <select
+                      value={dooplexHeader}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDooplexHeader(value);
+                      if (value) setDooplexQuality(value);
+                    }}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                    >
+                      {HEADER_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Idioma (Lang)</label>
+                    <select
+                      value={dooplexLang}
+                      onChange={(e) => setDooplexLang(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                    >
+                      {LANG_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                    <select
+                      value={dooplexSource}
+                      onChange={(e) => setDooplexSource(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                    >
+                      {SOURCE_OPTIONS.map((opt) => (
+                        <option key={opt.label} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right Column: URLs and Progress */}

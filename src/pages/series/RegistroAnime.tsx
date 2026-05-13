@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Loader2, PlayCircle, Search } from 'lucide-react';
 import { getDooplexAnime, getDooplexAnimeEpisodes, getDooplexAnimeSeasons, registerDooplexAnimeEpisodeVideo } from '../../services/api';
 import { DooplexAnime, DooplexAnimeEpisode, DooplexAnimeSeason } from '../../types';
-import { HEADER_OPTIONS, LANG_OPTIONS, QUALITY_OPTIONS } from '../../lib/constants';
+import { HEADER_OPTIONS, LANG_OPTIONS, SERVER_OPTIONS } from '../../lib/constants';
 
 export default function RegistroAnime() {
   const [tmdbId, setTmdbId] = useState('');
@@ -69,9 +69,16 @@ export default function RegistroAnime() {
 
       try {
         const res = await getDooplexAnimeEpisodes(Number(selectedSeasonId));
-        const list = res.data || [];
-        setEpisodes(list);
-        setSelectedStartEpisodeId(list.length > 0 ? list[0].id : '');
+        const normalizedEpisodes = (res.data || [])
+          .map((ep) => ({
+            ...ep,
+            id: Number(ep.id),
+            episode_number: Number(ep.episode_number)
+          }))
+          .sort((a, b) => a.episode_number - b.episode_number);
+
+        setEpisodes(normalizedEpisodes);
+        setSelectedStartEpisodeId(normalizedEpisodes.length > 0 ? normalizedEpisodes[0].id : '');
       } catch {
         setEpisodes([]);
         setSelectedStartEpisodeId('');
@@ -98,6 +105,38 @@ export default function RegistroAnime() {
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
     const startIndex = episodes.findIndex((ep) => ep.id === Number(selectedStartEpisodeId));
+    if (episodes.length === 0) {
+      setProgress((prev) => ({
+        ...prev,
+        logs: [{ msg: 'Error: no hay episodios cargados para la temporada seleccionada.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    if (startIndex < 0) {
+      setProgress((prev) => ({
+        ...prev,
+        logs: [{ msg: 'Error: el episodio inicial seleccionado no se encontró en la lista de episodios cargada. Vuelve a seleccionar la temporada/episodio.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    const availableFromStart = episodes.length - startIndex;
+    if (availableFromStart < urlList.length) {
+      setProgress((prev) => ({
+        ...prev,
+        logs: [
+          {
+            msg: `Aviso: solo hay ${availableFromStart} episodios disponibles desde el episodio inicial seleccionado. Se intentarán registrar ${availableFromStart} de ${urlList.length} URLs.`,
+            isError: true
+          },
+          ...prev.logs
+        ]
+      }));
+    }
+
     let currentIndex = startIndex;
 
     for (let i = 0; i < urlList.length; i++) {
@@ -236,7 +275,7 @@ export default function RegistroAnime() {
                       onChange={(e) => setServer(e.target.value)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
-                      {QUALITY_OPTIONS.map((o) => (
+                      {SERVER_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
@@ -248,7 +287,11 @@ export default function RegistroAnime() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
                     <select
                       value={header}
-                      onChange={(e) => setHeader(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setHeader(value);
+                      if (value) setServer(value);
+                    }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {HEADER_OPTIONS.map((o) => (
@@ -347,4 +390,3 @@ export default function RegistroAnime() {
     </div>
   );
 }
-

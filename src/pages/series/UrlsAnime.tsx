@@ -15,7 +15,7 @@ import {
   DooplexAnimeEpisode,
   DooplexAnimeVideo
 } from '../../types';
-import { QUALITY_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
 
 export default function UrlsAnime() {
   const [tmdbId, setTmdbId] = useState('');
@@ -344,7 +344,7 @@ export default function UrlsAnime() {
                                         onChange={(e) => setEditForm({...editForm, server: e.target.value})}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
-                                        {QUALITY_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        {SERVER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
                                     <div className="sm:col-span-2">
@@ -359,7 +359,10 @@ export default function UrlsAnime() {
                                     <div className="sm:col-span-2">
                                       <select
                                         value={editForm.header || ''}
-                                        onChange={(e) => setEditForm({...editForm, header: e.target.value})}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                                        }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
                                         {HEADER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}

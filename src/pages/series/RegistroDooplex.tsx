@@ -11,7 +11,7 @@ import {
   DooplexSeason,
   DooplexEpisode
 } from '../../types';
-import { QUALITY_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function RegistroDooplex() {
   const [tmdbId, setTmdbId] = useState('');
@@ -36,6 +36,7 @@ export default function RegistroDooplex() {
   const [dooplexQuality, setDooplexQuality] = useState('1080P');
   const [dooplexHeader, setDooplexHeader] = useState('');
   const [dooplexLang, setDooplexLang] = useState('CAST');
+  const [dooplexSource, setDooplexSource] = useState('embed');
 
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
@@ -80,9 +81,18 @@ export default function RegistroDooplex() {
       if (selectedDooplexSeason) {
         try {
           const res = await getDooplexEpisodes(Number(selectedDooplexSeason));
-          setDooplexEpisodes(res.data || []);
-          if (res.data && res.data.length > 0) {
-            setSelectedStartEpisodeId(res.data[0].id);
+          const normalizedEpisodes = (res.data || [])
+            .map((ep) => ({
+              ...ep,
+              id: Number(ep.id),
+              season_id: Number(ep.season_id),
+              episode_number: Number(ep.episode_number)
+            }))
+            .sort((a, b) => a.episode_number - b.episode_number);
+
+          setDooplexEpisodes(normalizedEpisodes);
+          if (normalizedEpisodes.length > 0) {
+            setSelectedStartEpisodeId(normalizedEpisodes[0].id);
           } else {
             setSelectedStartEpisodeId('');
           }
@@ -107,6 +117,38 @@ export default function RegistroDooplex() {
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
     const startIndex = dooplexEpisodes.findIndex(ep => ep.id === Number(selectedStartEpisodeId));
+    if (dooplexEpisodes.length === 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: no hay episodios cargados para la temporada seleccionada.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    if (startIndex < 0) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ msg: 'Error: el episodio inicial seleccionado no se encontró en la lista de episodios cargada. Vuelve a seleccionar la temporada/episodio.', isError: true }, ...prev.logs]
+      }));
+      setIsRegistering(false);
+      return;
+    }
+
+    const availableFromStart = dooplexEpisodes.length - startIndex;
+    if (availableFromStart < urlList.length) {
+      setProgress(prev => ({
+        ...prev,
+        logs: [
+          {
+            msg: `Aviso: solo hay ${availableFromStart} episodios disponibles desde el episodio inicial seleccionado. Se intentarán registrar ${availableFromStart} de ${urlList.length} URLs.`,
+            isError: true
+          },
+          ...prev.logs
+        ]
+      }));
+    }
+
     let currentIndex = startIndex;
 
     for (let i = 0; i < urlList.length; i++) {
@@ -123,12 +165,20 @@ export default function RegistroDooplex() {
 
       // Dooplex Registration
       try {
+        const sourceFlags = {
+          embed: dooplexSource === 'embed' ? '1' : '0',
+          youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
+          hls: dooplexSource === 'hls' ? '1' : '0',
+          supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
+        };
+
         await registerDooplexLink({
           episode_id: currentEpisode.id,
           server: dooplexQuality,
           header: dooplexHeader,
           link: currentUrl,
-          lang: dooplexLang
+          lang: dooplexLang,
+          ...sourceFlags
         });
         setProgress(prev => ({
           ...prev,
@@ -248,7 +298,7 @@ export default function RegistroDooplex() {
                     onChange={(e) => setDooplexQuality(e.target.value)}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                   >
-                    {QUALITY_OPTIONS.map((opt) => (
+                    {SERVER_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
@@ -257,7 +307,11 @@ export default function RegistroDooplex() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
                   <select
                     value={dooplexHeader}
-                    onChange={(e) => setDooplexHeader(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDooplexHeader(value);
+                      if (value) setDooplexQuality(value);
+                    }}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                   >
                     {HEADER_OPTIONS.map((opt) => (
@@ -274,6 +328,18 @@ export default function RegistroDooplex() {
                   >
                     {LANG_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <select
+                    value={dooplexSource}
+                    onChange={(e) => setDooplexSource(e.target.value)}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                  >
+                    {SOURCE_OPTIONS.map((opt) => (
+                      <option key={opt.label} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>

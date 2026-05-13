@@ -9,6 +9,8 @@ interface SidebarProps {
 
 export const Sidebar = ({ onClose }: SidebarProps) => {
   const location = useLocation();
+  const plusmovieMode = new URLSearchParams(location.search).get('mode');
+  const isPlusmovieSeriesRActive = location.pathname === '/series/registro-doble' && plusmovieMode === 'plusmovie';
   const { user } = useAuthStore();
   const [isSeriesOpen, setIsSeriesOpen] = useState(location.pathname.includes('/series'));
   const [isMoviesOpen, setIsMoviesOpen] = useState(location.pathname.includes('/movies'));
@@ -92,13 +94,25 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   to="/series/registro-doble"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/registro-doble'
+                    location.pathname === '/series/registro-doble' && !isPlusmovieSeriesRActive
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
                   <Clapperboard className="h-4 w-4" />
                   Registro Doble
+                </Link>
+                <Link
+                  to="/series/registro-doble?mode=plusmovie"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isPlusmovieSeriesRActive
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Clapperboard className="h-4 w-4" />
+                  Registro Plusmovie
                 </Link>
                 <Link
                   to="/series/registro-doble-update"
@@ -427,6 +441,30 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                 >
                   <Film className="h-4 w-4" />
                   Movies CineHDPlus
+                </Link>
+                <Link
+                  to="/extraccion/seriesly-movie"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/extraccion/seriesly-movie'
+                      ? 'bg-slate-50 text-slate-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Film className="h-4 w-4" />
+                  Series.ly Movie
+                </Link>
+                <Link
+                  to="/extraccion/seriesly-series"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/extraccion/seriesly-series'
+                      ? 'bg-slate-50 text-slate-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <ListVideo className="h-4 w-4" />
+                  Series.ly Series
                 </Link>
                 <Link
                   to="/extraccion/animeonline-ninja"

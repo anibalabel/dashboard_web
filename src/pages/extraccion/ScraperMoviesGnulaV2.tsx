@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, Copy, AlertCircle, Terminal, CheckCircle } from 'lucide-react';
 
-type AllowedHost = 'voe.sx' | 'bysevepoin.com' | 'vidsonic.net';
+type AllowedHost = 'voe.sx' | 'bysevepoin.com' | 'vidsonic.net' | 'dtpg.rpmplay.xyz' | 'gdtvid.p2pplay.pro' | 'ok.ru';
 
 type ScrapedServer = {
   title: string;
@@ -52,7 +52,7 @@ export default function ScraperMoviesGnulaV2() {
       const html = await fetchHTML(url);
       const doc = new DOMParser().parseFromString(html, 'text/html');
 
-      const allowedHosts: AllowedHost[] = ['voe.sx', 'bysevepoin.com', 'vidsonic.net'];
+      const allowedHosts: AllowedHost[] = ['voe.sx', 'bysevepoin.com', 'vidsonic.net', 'dtpg.rpmplay.xyz', 'gdtvid.p2pplay.pro', 'ok.ru'];
 
       const scripts = Array.from(doc.querySelectorAll('script'));
       let gdArraySource: string | null = null;
@@ -107,7 +107,10 @@ export default function ScraperMoviesGnulaV2() {
         if (typeof s.title !== 'string' || typeof s.src !== 'string') return null;
         let host: string;
         try {
-          host = new URL(s.src).hostname;
+          const rawHost = new URL(s.src).hostname.toLowerCase();
+          if (rawHost === 'ok.ru' || rawHost.endsWith('.ok.ru')) host = 'ok.ru';
+          else if (rawHost === 'vidsonic.net' || rawHost.endsWith('.vidsonic.net')) host = 'vidsonic.net';
+          else host = rawHost;
         } catch {
           return null;
         }
@@ -204,6 +207,9 @@ export default function ScraperMoviesGnulaV2() {
                   >
                     <option value="all">Todos (permitidos)</option>
                     <option value="vidsonic.net">vidsonic.net</option>
+                    <option value="dtpg.rpmplay.xyz">dtpg.rpmplay.xyz</option>
+                    <option value="gdtvid.p2pplay.pro">gdtvid.p2pplay.pro</option>
+                    <option value="ok.ru">ok.ru</option>
                     <option value="bysevepoin.com">bysevepoin.com</option>
                     <option value="voe.sx">voe.sx</option>
                   </select>

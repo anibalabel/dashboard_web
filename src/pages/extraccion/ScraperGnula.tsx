@@ -27,7 +27,7 @@ export default function ScraperGnula() {
   const [url, setUrl] = useState('');
   const [targetSeason, setTargetSeason] = useState('');
   const [limit, setLimit] = useState('');
-  const [serverType, setServerType] = useState('bysevepoin'); // 'bysevepoin' or 'voe'
+  const [serverType, setServerType] = useState<'bysevepoin' | 'voe' | 'vidsonic' | 'rpmplay' | 'p2pplay' | 'okru'>('bysevepoin');
   
   const [isScraping, setIsScraping] = useState(false);
   const [logs, setLogs] = useState<{ msg: string; isError: boolean }[]>([]);
@@ -73,10 +73,14 @@ export default function ScraperGnula() {
 
     try {
       const host = new URL(finalUrl).hostname.toLowerCase();
-      const matchesServer =
-        serverType === 'bysevepoin'
-          ? host.includes('bysevepoin') || host.includes('vidsonic')
-          : host.includes('voe');
+      const matchesServer = (() => {
+        if (serverType === 'voe') return host.includes('voe');
+        if (serverType === 'vidsonic') return host.includes('vidsonic');
+        if (serverType === 'rpmplay') return host.includes('rpmplay');
+        if (serverType === 'p2pplay') return host.includes('p2pplay');
+        if (serverType === 'okru') return host === 'ok.ru' || host.endsWith('.ok.ru');
+        return host.includes('bysevepoin') || host.includes('vidsonic');
+      })();
 
       if (!matchesServer) return null;
       return finalUrl;
@@ -405,10 +409,14 @@ export default function ScraperGnula() {
                   </label>
                   <select
                     value={serverType}
-                    onChange={(e) => setServerType(e.target.value)}
+                    onChange={(e) => setServerType(e.target.value as 'bysevepoin' | 'voe' | 'vidsonic' | 'rpmplay' | 'p2pplay' | 'okru')}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                   >
                     <option value="bysevepoin">Filemoon (bysevepoin)</option>
+                    <option value="vidsonic">vidsonic.net</option>
+                    <option value="rpmplay">dtpg.rpmplay.xyz</option>
+                    <option value="p2pplay">gdtvid.p2pplay.pro</option>
+                    <option value="okru">ok.ru</option>
                     <option value="voe">VOE (voe)</option>
                   </select>
                 </div>

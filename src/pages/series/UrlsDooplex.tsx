@@ -15,7 +15,7 @@ import {
   DooplexEpisode,
   DooplexVideo
 } from '../../types';
-import { QUALITY_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function UrlsDooplex() {
   const [tmdbId, setTmdbId] = useState('');
@@ -53,6 +53,14 @@ export default function UrlsDooplex() {
   });
 
   const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+  const resolveSourceValue = (video: Partial<DooplexVideo>) => {
+    if (Number(video.embed) === 1) return 'embed';
+    if (Number(video.youtubelink) === 1) return 'youtubelink';
+    if (Number(video.hls) === 1) return 'hls';
+    if (Number(video.supported_hosts) === 1) return 'supported_hosts';
+    return 'embed';
+  };
 
   const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -114,7 +122,14 @@ export default function UrlsDooplex() {
 
   const handleEdit = (video: DooplexVideo) => {
     setEditingId(video.id);
-    setEditForm(video);
+    const source = resolveSourceValue(video);
+    setEditForm({
+      ...video,
+      embed: source === 'embed' ? '1' : '0',
+      youtubelink: source === 'youtubelink' ? '1' : '0',
+      hls: source === 'hls' ? '1' : '0',
+      supported_hosts: source === 'supported_hosts' ? '1' : '0'
+    });
   };
 
   const handleCancelEdit = () => {
@@ -131,7 +146,11 @@ export default function UrlsDooplex() {
         link: editForm.link,
         server: editForm.server,
         header: editForm.header,
-        lang: editForm.lang
+        lang: editForm.lang,
+        embed: editForm.embed,
+        youtubelink: editForm.youtubelink,
+        hls: editForm.hls,
+        supported_hosts: editForm.supported_hosts
       });
       
       // Update local state
@@ -345,13 +364,16 @@ export default function UrlsDooplex() {
                                         onChange={(e) => setEditForm({...editForm, server: e.target.value})}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
-                                        {QUALITY_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        {SERVER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
                                     <div className="sm:col-span-2">
                                       <select
                                         value={editForm.header || ''}
-                                        onChange={(e) => setEditForm({...editForm, header: e.target.value})}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                                        }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
                                         {HEADER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -366,7 +388,25 @@ export default function UrlsDooplex() {
                                         {LANG_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="sm:col-span-4">
+                                    <div className="sm:col-span-2">
+                                      <select
+                                        value={resolveSourceValue(editForm)}
+                                        onChange={(e) => {
+                                          const source = e.target.value;
+                                          setEditForm({
+                                            ...editForm,
+                                            embed: source === 'embed' ? '1' : '0',
+                                            youtubelink: source === 'youtubelink' ? '1' : '0',
+                                            hls: source === 'hls' ? '1' : '0',
+                                            supported_hosts: source === 'supported_hosts' ? '1' : '0'
+                                          });
+                                        }}
+                                        className="w-full rounded border-gray-300 text-xs p-1.5"
+                                      >
+                                        {SOURCE_OPTIONS.map(opt => <option key={opt.label} value={opt.value}>{opt.label}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="sm:col-span-2">
                                       <input
                                         type="text"
                                         value={editForm.link}
