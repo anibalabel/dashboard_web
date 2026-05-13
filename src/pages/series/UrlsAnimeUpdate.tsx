@@ -3,7 +3,10 @@ import { AlertCircle, Loader2, RefreshCw, Search } from 'lucide-react';
 import { getDooplexAnime, getDooplexAnimeEpisodes, getDooplexAnimeSeasons, updateDooplexAnimeEpisode } from '../../services/api';
 import { DooplexAnime, DooplexAnimeEpisode, DooplexAnimeSeason } from '../../types';
 
+import { useSnackbarStore } from '../../store/snackbarStore';
+
 export default function UrlsAnimeUpdate() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -81,7 +84,7 @@ export default function UrlsAnimeUpdate() {
 
     const selectedSeasonObj = seasons.find((s) => Number(s.id) === Number(selectedSeason));
     if (!selectedSeasonObj) {
-      alert(`No se encontró la temporada seleccionada en la lista de Anime. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`);
+      showSnackbar(`No se encontró la temporada seleccionada en la lista de Anime. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`, 'error');
       return;
     }
 

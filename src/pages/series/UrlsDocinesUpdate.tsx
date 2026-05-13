@@ -8,7 +8,10 @@ import {
 } from '../../services/api';
 import { DocinesEpisode, DocinesSeason, DocinesSerie } from '../../types';
 
+import { useSnackbarStore } from '../../store/snackbarStore';
+
 export default function UrlsDocinesUpdate() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -85,7 +88,7 @@ export default function UrlsDocinesUpdate() {
 
     const selectedSeasonObj = seasons.find(s => Number(s.id) === Number(selectedSeason));
     if (!selectedSeasonObj) {
-      alert(`No se encontró la temporada seleccionada en la lista de Docines. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`);
+      showSnackbar(`No se encontró la temporada seleccionada en la lista de Docines. IDs disponibles: ${seasons.map(s => s.id).join(', ')}`, 'error');
       return;
     }
 

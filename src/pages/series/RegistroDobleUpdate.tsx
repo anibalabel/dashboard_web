@@ -22,7 +22,10 @@ import {
   PlusmovieEpisode
 } from '../../types';
 
+import { useSnackbarStore } from '../../store/snackbarStore';
+
 export default function RegistroDobleUpdate() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -200,7 +203,7 @@ export default function RegistroDobleUpdate() {
 
   const handleUpdateDooplexEpisodesMetadata = async () => {
     if (!tmdbId || !selectedDooplexSeason) {
-      alert(`Falta información: tmdbId=${tmdbId}, selectedDooplexSeason=${selectedDooplexSeason}`);
+      showSnackbar(`Falta información: tmdbId=${tmdbId}, selectedDooplexSeason=${selectedDooplexSeason}`, 'error');
       return;
     }
 
@@ -208,7 +211,7 @@ export default function RegistroDobleUpdate() {
     const selectedSeasonObj = dooplexSeasons.find(s => Number(s.id) === Number(selectedDooplexSeason));
     
     if (!selectedSeasonObj) {
-      alert(`No se encontró la temporada seleccionada en la lista de Dooplex. IDs disponibles: ${dooplexSeasons.map(s => s.id).join(', ')}`);
+      showSnackbar(`No se encontró la temporada seleccionada en la lista de Dooplex. IDs disponibles: ${dooplexSeasons.map(s => s.id).join(', ')}`, 'error');
       return;
     }
 

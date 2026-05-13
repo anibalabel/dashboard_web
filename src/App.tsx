@@ -41,10 +41,12 @@ import VersionApp from "@/pages/VersionApp";
 import UqloadMod from "@/pages/herramientas/UqloadMod";
 import UrlsMod from "@/pages/herramientas/UrlsMod";
 import Dominios from "@/pages/herramientas/Dominios";
+import Snackbar from "@/components/Snackbar";
 
 export default function App() {
   return (
     <Router>
+      <Snackbar />
       <Routes>
         <Route path="/login" element={<Login />} />
         
