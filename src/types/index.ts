@@ -73,11 +73,16 @@ export interface DooplexEpisodeUpdatePayload {
   still_path_tv: string;
 }
 
-export interface DooplexVideo {  id: number;
+export interface DooplexVideo {
+  id: number;
   server: string;
   header: string;
   link: string;
   lang: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface DooplexUpdatePayload {
@@ -86,6 +91,10 @@ export interface DooplexUpdatePayload {
   server?: string;
   header?: string;
   lang?: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface PlusmovieSerie {
@@ -312,6 +321,10 @@ export interface DooplexMovieVideo {
   header: string;
   link: string;
   lang: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface DooplexMovieVideoUpdatePayload {
@@ -320,6 +333,10 @@ export interface DooplexMovieVideoUpdatePayload {
   header?: string;
   link?: string;
   lang?: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface DocinesMovieVideo {
