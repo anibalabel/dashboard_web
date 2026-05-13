@@ -16,8 +16,10 @@ import {
   DooplexAnimeVideo
 } from '../../types';
 import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsAnime() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -141,7 +143,7 @@ export default function UrlsAnime() {
       }));
       setEditingId(null);
     } catch {
-      alert('Error al actualizar el video');
+      showSnackbar('Error al actualizar el video', 'error');
     }
   };
 
@@ -158,7 +160,7 @@ export default function UrlsAnime() {
             [episodeId]: prev[episodeId].filter(v => v.id !== id)
           }));
         } catch {
-          alert('Error al eliminar el video');
+          showSnackbar('Error al eliminar el video', 'error');
         }
       }
     });
@@ -185,7 +187,7 @@ export default function UrlsAnime() {
           });
           setSelectedVideos([]);
         } catch {
-          alert('Error al eliminar algunos videos');
+          showSnackbar('Error al eliminar algunos videos', 'error');
         }
       }
     });
@@ -206,7 +208,7 @@ export default function UrlsAnime() {
       : Object.values(videosMap).flat().map(v => v.link).join('\n');
     
     navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   return (
@@ -415,7 +417,7 @@ export default function UrlsAnime() {
                                       <button 
                                         onClick={() => {
                                           navigator.clipboard.writeText(video.link);
-                                          alert('URL copiada');
+                                          showSnackbar('URL copiada', 'success');
                                         }}
                                         className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold transition-colors"
                                       >

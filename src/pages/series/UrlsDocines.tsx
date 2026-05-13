@@ -11,8 +11,10 @@ import {
 } from '../../services/api';
 import { DocinesEpisode, DocinesSeason, DocinesSerie, DocinesVideoLink } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS } from '../../lib/constants';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDocines() {
+  const { showSnackbar } = useSnackbarStore();
   const [tmdbId, setTmdbId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
@@ -122,7 +124,7 @@ export default function UrlsDocines() {
         ? Object.values(videosMap).flat().filter(v => selectedVideos.includes(v.id)).map(v => v.url).join('\n')
         : Object.values(videosMap).flat().map(v => v.url).join('\n');
     await navigator.clipboard.writeText(urls);
-    alert('URLs copiadas al portapapeles');
+    showSnackbar('URLs copiadas al portapapeles', 'success');
   };
 
   const handleEdit = (video: DocinesVideoLink) => {
@@ -152,7 +154,7 @@ export default function UrlsDocines() {
       setEditingId(null);
       setEditForm({});
     } catch {
-      alert('Error al actualizar el enlace');
+      showSnackbar('Error al actualizar el enlace', 'error');
     }
   };
 
@@ -170,11 +172,10 @@ export default function UrlsDocines() {
           }));
           setSelectedVideos(prev => prev.filter(v => v !== id));
           if (editingId === id) {
-            setEditingId(null);
             setEditForm({});
           }
         } catch {
-          alert('Error al eliminar el enlace');
+          showSnackbar('Error al eliminar el enlace', 'error');
         }
       }
     });
@@ -202,7 +203,7 @@ export default function UrlsDocines() {
           setEditingId(null);
           setEditForm({});
         } catch {
-          alert('Error al eliminar algunos enlaces');
+          showSnackbar('Error al eliminar algunos enlaces', 'error');
         }
       }
     });
@@ -413,7 +414,7 @@ export default function UrlsDocines() {
                                           <button
                                             onClick={() => {
                                               navigator.clipboard.writeText(video.url);
-                                              alert('URL copiada');
+                                              showSnackbar('URL copiada', 'success');
                                             }}
                                             className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold transition-colors"
                                             type="button"

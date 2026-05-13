@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Globe, Plus, Trash2, Edit2, Loader2, Save, X, AlertCircle } from 'lucide-react';
 import { ref, onValue, set } from 'firebase/database';
 import { database } from '../../lib/firebase';
+import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function Dominios() {
+  const { showSnackbar } = useSnackbarStore();
   const [domains, setDomains] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [newDomain, setNewDomain] = useState('');
@@ -35,14 +37,16 @@ export default function Dominios() {
     return () => unsubscribe();
   }, []);
 
-  const saveDomains = async (newDomainsList: string[]) => {
+  const saveDomains = async (newDomainsList: string[], successMessage: string) => {
     setIsSaving(true);
     setError(null);
     try {
       await set(ref(database, 'allowed_domains/domains'), newDomainsList);
+      showSnackbar(successMessage, 'success');
     } catch (err: any) {
       console.error("Error saving domains:", err);
       setError("Error al guardar. Asegúrate de tener permisos de escritura (.write: true) en las reglas de Firebase.");
+      showSnackbar("Error al guardar en Firebase", 'error');
     } finally {
       setIsSaving(false);
     }
@@ -67,14 +71,14 @@ export default function Dominios() {
     }
 
     const updatedDomains = [...domains, domainToAdd];
-    saveDomains(updatedDomains);
+    saveDomains(updatedDomains, "Dominio agregado con éxito");
     setNewDomain('');
   };
 
   const handleDeleteDomain = (index: number) => {
     if (confirm('¿Estás seguro de que deseas eliminar este dominio?')) {
       const updatedDomains = domains.filter((_, i) => i !== index);
-      saveDomains(updatedDomains);
+      saveDomains(updatedDomains, "Dominio eliminado con éxito");
     }
   };
 
@@ -98,7 +102,7 @@ export default function Dominios() {
 
     const updatedDomains = [...domains];
     updatedDomains[editingIndex!] = newDomainValue;
-    saveDomains(updatedDomains);
+    saveDomains(updatedDomains, "Dominio actualizado con éxito");
     setEditingIndex(null);
     setEditValue('');
   };
