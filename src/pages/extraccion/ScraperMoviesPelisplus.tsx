@@ -7,6 +7,46 @@ interface ScrapedResult {
   sub?: string | null;
 }
 
+const POW_CHALLENGE = '8147cce513624b7c73b28c9b7166d9df';
+const POW_DIFFICULTY = 3;
+const POW_SALT = '6d07665b9850a0db';
+let cachedAesKey: Uint8Array | null = null;
+
+async function sha256(str: string) {
+  const buf = new TextEncoder().encode(str);
+  const hash = await window.crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function solvePoW() {
+  if (cachedAesKey) return cachedAesKey;
+  const prefix = '0'.repeat(POW_DIFFICULTY);
+  let nonce = 0;
+  while (true) {
+    const hash = await sha256(POW_CHALLENGE + nonce);
+    if (hash.startsWith(prefix)) {
+      const keyHash = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(POW_CHALLENGE + nonce + POW_SALT));
+      cachedAesKey = new Uint8Array(keyHash);
+      return cachedAesKey;
+    }
+    nonce++;
+    if (nonce > 100000) return null;
+  }
+}
+
+async function decryptAES(encryptedBase64: string, aesKey: Uint8Array) {
+  try {
+    const raw = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+    const iv = raw.slice(0, 16);
+    const ciphertext = raw.slice(16);
+    const key = await window.crypto.subtle.importKey('raw', aesKey.slice(0, 32), { name: 'AES-CBC' }, false, ['decrypt']);
+    const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, key, ciphertext);
+    return new TextDecoder().decode(decrypted);
+  } catch (e) {
+    return encryptedBase64;
+  }
+}
+
 export default function ScraperMoviesPelisplus() {
   const [url, setUrl] = useState('');
   const [targetServer, setTargetServer] = useState('voe'); // Default a voe
@@ -222,6 +262,26 @@ export default function ScraperMoviesPelisplus() {
         }
 
         const parsedData = new Function(`return ${dataMatch[1]}`)();
+
+        addLog(`Verificando encriptación PoW + AES...`);
+        const aesKey = await solvePoW();
+        if (aesKey) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const langGroup of parsedData) {
+            if (langGroup.sortedEmbeds) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              for (const embed of langGroup.sortedEmbeds) {
+                if (embed.link) embed.link = await decryptAES(embed.link, aesKey);
+              }
+            }
+            if (langGroup.downloadEmbeds) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              for (const embed of langGroup.downloadEmbeds) {
+                if (embed.link) embed.link = await decryptAES(embed.link, aesKey);
+              }
+            }
+          }
+        }
 
         let latUrl = null;
         let castUrl = null;
