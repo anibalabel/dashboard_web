@@ -15,10 +15,7 @@ interface ScrapedResult {
   sub?: string | null;
 }
 
-const POW_CHALLENGE = '8147cce513624b7c73b28c9b7166d9df';
-const POW_DIFFICULTY = 3;
-const POW_SALT = '6d07665b9850a0db';
-let cachedAesKey: Uint8Array | null = null;
+const powCache = new Map<string, Uint8Array>();
 
 async function sha256(str: string) {
   const buf = new TextEncoder().encode(str);
@@ -26,19 +23,20 @@ async function sha256(str: string) {
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function solvePoW() {
-  if (cachedAesKey) return cachedAesKey;
-  const prefix = '0'.repeat(POW_DIFFICULTY);
+async function solvePoW(challenge: string, difficulty: number, salt: string) {
+  if (powCache.has(challenge)) return powCache.get(challenge);
+  const prefix = '0'.repeat(difficulty);
   let nonce = 0;
   while (true) {
-    const hash = await sha256(POW_CHALLENGE + nonce);
+    const hash = await sha256(challenge + nonce);
     if (hash.startsWith(prefix)) {
-      const keyHash = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(POW_CHALLENGE + nonce + POW_SALT));
-      cachedAesKey = new Uint8Array(keyHash);
-      return cachedAesKey;
+      const keyHash = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(challenge + nonce + salt));
+      const aesKey = new Uint8Array(keyHash);
+      powCache.set(challenge, aesKey);
+      return aesKey;
     }
     nonce++;
-    if (nonce > 100000) return null;
+    if (nonce > 500000) return null;
   }
 }
 
@@ -310,7 +308,18 @@ export default function ScraperPelisplusSeries() {
           const parsedData = new Function(`return ${dataMatch[1]}`)();
 
           addLog(`Verificando encriptación PoW + AES para S${ep.season}xE${ep.episode}...`);
-          const aesKey = await solvePoW();
+          const powChallengeMatch = iframeHtml.match(/POW_CHALLENGE\s*=\s*['"]([^'"]+)['"]/);
+          const powDifficultyMatch = iframeHtml.match(/POW_DIFFICULTY\s*=\s*(\d+)/);
+          const powSaltMatch = iframeHtml.match(/POW_SALT\s*=\s*['"]([^'"]+)['"]/);
+
+          let aesKey: Uint8Array | null = null;
+          if (powChallengeMatch && powDifficultyMatch && powSaltMatch) {
+              aesKey = await solvePoW(powChallengeMatch[1], parseInt(powDifficultyMatch[1]), powSaltMatch[1]);
+          } else {
+              // Fallback to hardcoded from first implementation if not found (just in case)
+              aesKey = await solvePoW('8147cce513624b7c73b28c9b7166d9df', 3, '6d07665b9850a0db');
+          }
+
           if (aesKey) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             for (const langGroup of parsedData) {
@@ -367,14 +376,14 @@ export default function ScraperPelisplusSeries() {
                      } catch (e) { /* Not a valid JWT, proceed to other checks */ }
                   }
 
-                  // 2. If not a JWT, check if it's a direct ID for known hosts
+                  // 2. If not a JWT, check if it's already a full URL or a direct ID for known hosts
                   if (!cleanUrl) {
-                    if (serverName === 'voe') {
+                    if (linkValue.startsWith('http')) {
+                        cleanUrl = linkValue;
+                    } else if (serverName === 'voe') {
                         cleanUrl = `https://voe.sx/e/${linkValue}`;
                     } else if (serverName === 'filemoon') {
                         cleanUrl = `https://filemoon.sx/e/${linkValue}`;
-                    } else if (linkValue.startsWith('http')) {
-                        cleanUrl = linkValue;
                     }
                   }
                   
