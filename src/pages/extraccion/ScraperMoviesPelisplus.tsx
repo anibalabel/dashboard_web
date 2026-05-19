@@ -243,20 +243,47 @@ export default function ScraperMoviesPelisplus() {
              if (String(server.servername).toLowerCase() !== targetServer.toLowerCase()) continue;
              
              try {
-                // Decodificar JWT token
-                const parts = server.link.split('.');
+                let cleanUrl: string | null = null;
+                const serverName = String(server.servername).toLowerCase();
+                const linkValue = server.link;
+
+                // 1. Check for JWT
+                const parts = linkValue.split('.');
                 if (parts.length === 3) {
-                   // Fix base64 padding issues
-                   const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-                   const pad = base64Url.length % 4;
-                   const padded = pad ? base64Url + '='.repeat(4 - pad) : base64Url;
-                   
-                   const payload = JSON.parse(atob(padded));
-                   if (payload.link) {
-                      let cleanUrl = payload.link.replace(/`/g, '').trim();
-                      
-                      // Resolve Streamwish redirects
-                      if (String(server.servername).toLowerCase() === 'streamwish') {
+                   try {
+                     const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                     const pad = base64Url.length % 4;
+                     const padded = pad ? base64Url + '='.repeat(4 - pad) : base64Url;
+                     const payload = JSON.parse(atob(padded));
+                     if (payload.link) {
+                       cleanUrl = payload.link.replace(/`/g, '').trim();
+                     }
+                   } catch (e) { /* Not a valid JWT, proceed to other checks */ }
+                }
+
+                // 2. If not a JWT, check if it's a direct ID for known hosts
+                if (!cleanUrl) {
+                  if (serverName === 'voe') {
+                      cleanUrl = `https://voe.sx/e/${linkValue}`;
+                  } else if (serverName === 'filemoon') {
+                      cleanUrl = `https://filemoon.sx/e/${linkValue}`;
+                  } else if (linkValue.startsWith('http')) {
+                      cleanUrl = linkValue;
+                  }
+                }
+                
+                // 3. If still no URL, try decoding as Base64 (for servers like streamwish, vidhide)
+                if (!cleanUrl) {
+                    try {
+                        const decoded = atob(linkValue);
+                        if (decoded.startsWith('http')) {
+                            cleanUrl = decoded;
+                        }
+                    } catch (e) { /* Not Base64 */ }
+                }
+
+                if (cleanUrl) {
+                      if (serverName === 'streamwish') {
                           addLog(`Resolviendo redirección de Streamwish...`);
                           cleanUrl = await resolveRedirect(cleanUrl);
                       }
@@ -273,9 +300,9 @@ export default function ScraperMoviesPelisplus() {
                         if (!latUrl) latUrl = cleanUrl;
                       }
                    }
-                }
              } catch (e) {
-                console.error("Error decodificando token", e);
+                console.error("Error procesando el enlace", e);
+                addLog(`Error al procesar enlace para ${server.servername}: ${e instanceof Error ? e.message : 'Error desconocido'}`);
              }
            }
         }
