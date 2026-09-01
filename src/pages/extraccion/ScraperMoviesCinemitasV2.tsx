@@ -9,6 +9,7 @@ interface ScrapedResult {
 
 export default function ScraperMoviesCinemitasV2() {
   const [url, setUrl] = useState('');
+  const [targetServer, setTargetServer] = useState('TODOS');
   
   const [isScraping, setIsScraping] = useState(false);
   const [logs, setLogs] = useState<{ msg: string; isError: boolean }[]>([]);
@@ -108,7 +109,11 @@ export default function ScraperMoviesCinemitasV2() {
 
           if ('embed_url' in value) {
             const maybe = (value as { embed_url?: unknown }).embed_url;
-            if (typeof maybe === 'string') return maybe;
+            if (typeof maybe === 'string') {
+              const iframeMatch = maybe.match(/<(?:iframe|embed)[^>]+src=["']([^"']+)["']/i);
+              if (iframeMatch) return iframeMatch[1];
+              return maybe;
+            }
           }
 
           if ('data' in value) {
@@ -178,6 +183,26 @@ export default function ScraperMoviesCinemitasV2() {
             embedUrl = embedUrl.replace(/\\/g, '').replace(/["'`]/g, '').trim();
             if (embedUrl.startsWith('//')) embedUrl = `https:${embedUrl}`;
 
+            // Función auxiliar para verificar servidor
+            const matchServer = (urlOrText: string, target: string): boolean => {
+              if (!urlOrText) return false;
+              if (target === 'TODOS') return true;
+              const lower = urlOrText.toLowerCase();
+              if (target === 'uqload') return lower.includes('uqload');
+              if (target === 'vidara') return lower.includes('vidara');
+              if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse');
+              if (target === 'audinifer') return lower.includes('audinifer');
+              return lower.includes(target.toLowerCase());
+            };
+
+            if (targetServer !== 'TODOS') {
+              const matchesTarget = matchServer(embedUrl, targetServer) || matchServer(title, targetServer);
+              if (!matchesTarget) {
+                addLog(`Descartado (no coincide con ${targetServer}): ${embedUrl}`);
+                continue;
+              }
+            }
+
             addLog(`URL final (nume=${nume}): ${embedUrl}`);
             const item = { nume, title, src: embedUrl };
             if (lang === 'LAT') {
@@ -195,9 +220,9 @@ export default function ScraperMoviesCinemitasV2() {
             cast: castLinks.length > 0 ? castLinks : undefined,
             sub: subLinks.length > 0 ? subLinks : undefined,
           });
-          addLog(`Éxito - LAT: ${latLinks.length > 0}, CAST: ${castLinks.length > 0}, SUB: ${subLinks.length > 0}`);
+          addLog(`Éxito (${targetServer}) - LAT: ${latLinks.length > 0}, CAST: ${castLinks.length > 0}, SUB: ${subLinks.length > 0}`);
         } else {
-          addLog(`No se encontraron embed_url en la página`, true);
+          addLog(`No se encontraron enlaces válidos para '${targetServer}' en la página`, true);
         }
       } catch (err) {
         addLog(`Error al procesar la película: ${err instanceof Error ? err.message : 'Error desconocido'}`, true);
@@ -260,6 +285,23 @@ export default function ScraperMoviesCinemitasV2() {
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Servidor a Buscar
+                </label>
+                <select
+                  value={targetServer}
+                  onChange={(e) => setTargetServer(e.target.value)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 bg-white text-gray-800"
+                >
+                  <option value="TODOS">Todos los Servidores (Auto)</option>
+                  <option value="uqload">Uqload</option>
+                  <option value="vidara">Vidara (vidara.so)</option>
+                  <option value="byse">Byse (bysezoxexe.com)</option>
+                  <option value="audinifer">Audinifer (audinifer.com)</option>
+                </select>
               </div>
 
               <button

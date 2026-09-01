@@ -165,6 +165,43 @@ export default function ScraperPelisplusSeries() {
             addLog(`S${ep.season}xE${ep.episode} crudo: ${rawVideoLine[0].substring(0, 100)}...`);
           }
 
+          if (targetServer === 'uqload') {
+            addLog(`Buscando enlace de redirección xupalace para Uqload en S${ep.season}xE${ep.episode}...`);
+            const uqlinkMatch = normalizedHtml.match(/(https?:\/\/xupalace\.org\/uqlink\.php\?id=[a-zA-Z0-9]+)/i);
+            
+            if (!uqlinkMatch) {
+              addLog(`No se encontró enlace de redirección xupalace en S${ep.season}xE${ep.episode}`, true);
+              continue;
+            }
+            
+            const uqlinkUrl = uqlinkMatch[1];
+            addLog(`Redirección de Uqload encontrada: ${uqlinkUrl}. Descargando iframe...`);
+            
+            const uqHtml = await fetchHTML(uqlinkUrl, ep.url);
+            
+            let uqloadEmbedUrl = '';
+            const iframeMatch = uqHtml.match(/<iframe[^>]+src=['"]([^'"]*uqload[^'"]*)['"]/i);
+            if (iframeMatch) {
+              uqloadEmbedUrl = iframeMatch[1];
+            } else {
+              const directMatch = uqHtml.match(/(https?:\/\/uqload\.[a-z]+\/embed-[a-zA-Z0-9._-]+\.html)/i);
+              if (directMatch) {
+                uqloadEmbedUrl = directMatch[1];
+              }
+            }
+            
+            if (uqloadEmbedUrl) {
+              if (uqloadEmbedUrl.startsWith('//')) {
+                uqloadEmbedUrl = 'https:' + uqloadEmbedUrl;
+              }
+              finalResults.push({ season: ep.season, episode: ep.episode, lat: uqloadEmbedUrl });
+              addLog(`Éxito S${ep.season}xE${ep.episode} (uqload) - LAT: ${uqloadEmbedUrl}`);
+            } else {
+              addLog(`No se encontró el iframe de Uqload en la redirección de S${ep.season}xE${ep.episode}`, true);
+            }
+            continue;
+          }
+
           // Buscar la variable JavaScript que contiene el iframe de embed69
           // Intento 1: Regex exacta del PHP original
           const phpRegexMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"]([^'"]+)['"]/i);
@@ -422,6 +459,7 @@ export default function ScraperPelisplusSeries() {
                     <option value="filemoon">Filemoon</option>
                     <option value="streamwish">Streamwish</option>
                     <option value="vidhide">Vidhide</option>
+                    <option value="uqload">Uqload</option>
                   </select>
                 </div>
               </div>

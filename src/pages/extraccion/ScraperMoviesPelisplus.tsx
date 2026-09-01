@@ -119,6 +119,48 @@ export default function ScraperMoviesPelisplus() {
             addLog(`La variable "video[1]" NO existe en el HTML descargado`);
           }
 
+          if (targetServer === 'uqload') {
+            addLog(`Buscando enlace de redirección xupalace para Uqload...`);
+            const uqlinkMatch = normalizedHtml.match(/(https?:\/\/xupalace\.org\/uqlink\.php\?id=[a-zA-Z0-9]+)/i);
+            
+            if (!uqlinkMatch) {
+              addLog(`No se encontró enlace de redirección xupalace en la película`, true);
+              throw new Error('Enlace de redirección no encontrado');
+            }
+            
+            const uqlinkUrl = uqlinkMatch[1];
+            addLog(`Redirección de Uqload encontrada: ${uqlinkUrl}. Descargando iframe...`);
+            
+            const uqHtml = await fetchHTML(uqlinkUrl, url);
+            
+            let uqloadEmbedUrl = '';
+            const iframeMatch = uqHtml.match(/<iframe[^>]+src=['"]([^'"]*uqload[^'"]*)['"]/i);
+            if (iframeMatch) {
+              uqloadEmbedUrl = iframeMatch[1];
+            } else {
+              const directMatch = uqHtml.match(/(https?:\/\/uqload\.[a-z]+\/embed-[a-zA-Z0-9._-]+\.html)/i);
+              if (directMatch) {
+                uqloadEmbedUrl = directMatch[1];
+              }
+            }
+            
+            if (uqloadEmbedUrl) {
+              if (uqloadEmbedUrl.startsWith('//')) {
+                uqloadEmbedUrl = 'https:' + uqloadEmbedUrl;
+              }
+              finalResults.push({ lat: uqloadEmbedUrl });
+              addLog(`Éxito (uqload) - LAT: ${uqloadEmbedUrl}`);
+            } else {
+              addLog(`No se encontró el iframe de Uqload en la redirección`, true);
+              throw new Error('Iframe de Uqload no encontrado');
+            }
+            
+            setResults(finalResults);
+            addLog('Extracción finalizada exitosamente.');
+            setIsScraping(false);
+            return;
+          }
+
           // Buscar la variable JavaScript que contiene el iframe de embed69
           // Intento 1: Regex exacta del PHP original que dices que funciona
           const phpRegexMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"]([^'"]+)['"]/i);
@@ -360,6 +402,7 @@ export default function ScraperMoviesPelisplus() {
                   <option value="filemoon">Filemoon</option>
                   <option value="streamwish">Streamwish</option>
                   <option value="vidhide">Vidhide</option>
+                  <option value="uqload">Uqload</option>
                 </select>
               </div>
 

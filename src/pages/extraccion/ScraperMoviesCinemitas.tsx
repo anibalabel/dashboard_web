@@ -9,6 +9,7 @@ interface ScrapedResult {
 
 export default function ScraperMoviesCinemitas() {
   const [url, setUrl] = useState('');
+  const [targetServer, setTargetServer] = useState('TODOS');
   
   const [isScraping, setIsScraping] = useState(false);
   const [logs, setLogs] = useState<{ msg: string; isError: boolean }[]>([]);
@@ -156,14 +157,26 @@ export default function ScraperMoviesCinemitas() {
         let castUrl = null;
         let subUrl = null;
 
-        // Función auxiliar para extraer links uqload de texto (HTML o JSON aplanado)
-        const extractUqload = (text: string): string | null => {
-           // Si viene un objeto embed_url del JSON
+        // Función auxiliar para verificar si una URL coincide con el servidor objetivo
+        const matchServer = (urlOrText: string, target: string): boolean => {
+           if (!urlOrText) return false;
+           if (target === 'TODOS') return true;
+           const lower = urlOrText.toLowerCase();
+           if (target === 'uqload') return lower.includes('uqload');
+           if (target === 'vidara') return lower.includes('vidara');
+           if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse');
+           if (target === 'audinifer') return lower.includes('audinifer');
+           return lower.includes(target.toLowerCase());
+        };
+
+        // Función auxiliar para extraer links de video (Uqload, Vidara, Bysezoxexe, Audinifer)
+        const extractVideoUrl = (text: string, serverFilter = targetServer): string | null => {
+           if (!text) return null;
            if (typeof text === 'string') {
               try {
                 const json = JSON.parse(text);
                 if (json.embed_url) {
-                   text = json.embed_url;
+                   text = typeof json.embed_url === 'string' ? json.embed_url : JSON.stringify(json.embed_url);
                 }
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
               } catch (err) {
@@ -171,24 +184,51 @@ export default function ScraperMoviesCinemitas() {
               }
            }
 
-           // Regex global para encontrar enlaces uqload
-           const uqloadRegex = /https?:\/\/[^\s"']*uqload[^\s"']*/ig;
-           const matches = text.match(uqloadRegex);
-           
+           // 1. Búsqueda en iframes/embeds
+           const iframeMatch = text.match(/<(?:iframe|embed)[^>]+src=["']([^"']+)["']/i);
+           if (iframeMatch) {
+              let cleanUrl = iframeMatch[1].replace(/\\/g, '').replace(/["']/g, '').trim();
+              if (cleanUrl.startsWith('//')) cleanUrl = 'https:' + cleanUrl;
+              if (serverFilter === 'TODOS') {
+                 if (/(?:uqload|vidara|bysezoxexe|audinifer)/i.test(cleanUrl) || /^https?:\/\//i.test(cleanUrl)) {
+                    return cleanUrl;
+                 }
+              } else if (matchServer(cleanUrl, serverFilter)) {
+                 return cleanUrl;
+              }
+           }
+
+           // 2. Regex según servidor
+           let regex: RegExp;
+           if (serverFilter === 'uqload') {
+              regex = /https?:\/\/[^\s"'<>]*uqload[^\s"'<>]*/gi;
+           } else if (serverFilter === 'vidara') {
+              regex = /https?:\/\/[^\s"'<>]*vidara[^\s"'<>]*/gi;
+           } else if (serverFilter === 'byse') {
+              regex = /https?:\/\/[^\s"'<>]*(?:bysezoxexe|byse)[^\s"'<>]*/gi;
+           } else if (serverFilter === 'audinifer') {
+              regex = /https?:\/\/[^\s"'<>]*audinifer[^\s"'<>]*/gi;
+           } else {
+              regex = /https?:\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|audinifer)[^\s"'<>]*/gi;
+           }
+
+           const matches = text.match(regex);
            if (matches && matches.length > 0) {
-              // Limpiar escapes y comillas
-              let cleanUrl = matches[0].replace(/\\/g, '').replace(/["']/g, '');
+              let cleanUrl = matches[0].replace(/\\/g, '').replace(/["']/g, '').trim();
               if (cleanUrl.startsWith('//')) cleanUrl = 'https:' + cleanUrl;
               return cleanUrl;
            }
-           
-           // Búsqueda en iframes/embeds
-           const iframeMatch = text.match(/<iframe[^>]+src=["']([^"']*uqload[^"']*)["']/i) || 
-                               text.match(/<embed[^>]+src=["']([^"']*uqload[^"']*)["']/i);
-           if (iframeMatch) {
-              let cleanUrl = iframeMatch[1].replace(/\\/g, '');
-              if (cleanUrl.startsWith('//')) cleanUrl = 'https:' + cleanUrl;
-              return cleanUrl;
+
+           // 3. Comprobación si el texto limpio es directamente la URL
+           const trimmed = text.replace(/\\/g, '').replace(/["']/g, '').trim();
+           if (serverFilter === 'TODOS') {
+              if (/^(?:https?:)?\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|audinifer)/i.test(trimmed)) {
+                 return trimmed.startsWith('//') ? 'https:' + trimmed : trimmed;
+              }
+           } else {
+              if (matchServer(trimmed, serverFilter) && /^(?:https?:)?\/\//i.test(trimmed)) {
+                 return trimmed.startsWith('//') ? 'https:' + trimmed : trimmed;
+              }
            }
            
            return null;
@@ -223,7 +263,7 @@ export default function ScraperMoviesCinemitas() {
                   const getUrl = `${apiTarget}?post=${postId}&nume=${nume}&type=${type}`;
                   addLog(`Intentando Vía A (GET): ${lang}`);
                   const getResponse = await fetchGET(getUrl, url);
-                  foundUrl = extractUqload(getResponse);
+                  foundUrl = extractVideoUrl(getResponse);
                } catch (err) {
                   console.warn('Fallo Vía A (GET player_api):', err);
                }
@@ -254,7 +294,7 @@ export default function ScraperMoviesCinemitas() {
                      const postResponse = await fetchPOST(adminAjaxUrl, body, url);
                      // fetchPOST devuelve JSON si puede, lo convertimos a string para buscar
                      const responseStr = typeof postResponse === 'object' ? JSON.stringify(postResponse) : postResponse;
-                     foundUrl = extractUqload(responseStr);
+                     foundUrl = extractVideoUrl(responseStr);
                   } catch (err) {
                      console.warn(`Fallo Vía B POST (${action}):`, err);
                   }
@@ -271,9 +311,9 @@ export default function ScraperMoviesCinemitas() {
 
         if (latUrl || castUrl || subUrl) {
           finalResults.push({ lat: latUrl, cast: castUrl, sub: subUrl });
-          addLog(`Éxito - LAT: ${!!latUrl}, CAST: ${!!castUrl}, SUB: ${!!subUrl}`);
+          addLog(`Éxito (${targetServer}) - LAT: ${!!latUrl}, CAST: ${!!castUrl}, SUB: ${!!subUrl}`);
         } else {
-          addLog(`No se encontraron videos Uqload en la página`, true);
+          addLog(`No se encontraron videos válidos para '${targetServer}' en la página`, true);
         }
       } catch (err) {
         addLog(`Error al procesar la película: ${err instanceof Error ? err.message : 'Error desconocido'}`, true);
@@ -339,6 +379,23 @@ export default function ScraperMoviesCinemitas() {
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Servidor a Buscar
+                </label>
+                <select
+                  value={targetServer}
+                  onChange={(e) => setTargetServer(e.target.value)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 bg-white text-gray-800"
+                >
+                  <option value="TODOS">Todos los Servidores (Auto)</option>
+                  <option value="uqload">Uqload</option>
+                  <option value="vidara">Vidara (vidara.so)</option>
+                  <option value="byse">Byse (bysezoxexe.com)</option>
+                  <option value="audinifer">Audinifer (audinifer.com)</option>
+                </select>
               </div>
 
               <button
