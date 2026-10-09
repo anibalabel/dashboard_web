@@ -16,7 +16,7 @@ import {
   DooplexAnimeEpisode,
   DooplexAnimeVideo
 } from '../../types';
-import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsAnime() {
@@ -56,6 +56,14 @@ export default function UrlsAnime() {
   });
 
   const closeConfirm = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+  const resolveSourceValue = (video: Partial<DooplexAnimeVideo>) => {
+    if (Number(video.embed) === 1) return 'embed';
+    if (Number(video.youtubelink) === 1) return 'youtubelink';
+    if (Number(video.hls) === 1) return 'hls';
+    if (Number(video.supported_hosts) === 1) return 'supported_hosts';
+    return 'embed';
+  };
 
   const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -117,7 +125,14 @@ export default function UrlsAnime() {
 
   const handleEdit = (video: DooplexAnimeVideo) => {
     setEditingId(video.id);
-    setEditForm(video);
+    const source = resolveSourceValue(video);
+    setEditForm({
+      ...video,
+      embed: source === 'embed' ? '1' : '0',
+      youtubelink: source === 'youtubelink' ? '1' : '0',
+      hls: source === 'hls' ? '1' : '0',
+      supported_hosts: source === 'supported_hosts' ? '1' : '0'
+    });
   };
 
   const handleCancelEdit = () => {
@@ -134,7 +149,11 @@ export default function UrlsAnime() {
         link: editForm.link,
         server: editForm.server,
         header: editForm.header,
-        lang: editForm.lang
+        lang: editForm.lang,
+        embed: editForm.embed,
+        youtubelink: editForm.youtubelink,
+        hls: editForm.hls,
+        supported_hosts: editForm.supported_hosts
       });
       
       // Update local state
@@ -143,6 +162,7 @@ export default function UrlsAnime() {
         [episodeId]: prev[episodeId].map(v => v.id === editingId ? { ...v, ...editForm } as DooplexAnimeVideo : v)
       }));
       setEditingId(null);
+      showSnackbar('Video actualizado correctamente', 'success');
     } catch {
       showSnackbar('Error al actualizar el video', 'error');
     }
@@ -376,10 +396,25 @@ export default function UrlsAnime() {
                                     <div className="sm:col-span-2">
                                       <select
                                         value={editForm.server}
-                                        onChange={(e) => setEditForm({...editForm, server: e.target.value})}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          setEditForm({ ...editForm, server: value, header: value });
+                                        }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
                                         {SERVER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <select
+                                        value={editForm.header || ''}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          setEditForm({ ...editForm, header: value, server: value });
+                                        }}
+                                        className="w-full rounded border-gray-300 text-xs p-1.5"
+                                      >
+                                        {HEADER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
                                     <div className="sm:col-span-2">
@@ -393,17 +428,23 @@ export default function UrlsAnime() {
                                     </div>
                                     <div className="sm:col-span-2">
                                       <select
-                                        value={editForm.header || ''}
+                                        value={resolveSourceValue(editForm)}
                                         onChange={(e) => {
-                                          const value = e.target.value;
-                                          setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                                          const source = e.target.value;
+                                          setEditForm({
+                                            ...editForm,
+                                            embed: source === 'embed' ? '1' : '0',
+                                            youtubelink: source === 'youtubelink' ? '1' : '0',
+                                            hls: source === 'hls' ? '1' : '0',
+                                            supported_hosts: source === 'supported_hosts' ? '1' : '0'
+                                          });
                                         }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
-                                        {HEADER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        {SOURCE_OPTIONS.map(opt => <option key={opt.label} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="sm:col-span-4">
+                                    <div className="sm:col-span-2">
                                       <input
                                         type="text"
                                         value={editForm.link}

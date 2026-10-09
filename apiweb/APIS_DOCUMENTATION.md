@@ -4,7 +4,9 @@ Este documento describe el funcionamiento y los endpoints disponibles en las API
 
 ---
 
-## 0. API: Dashboard
+## 0. API: Dashboard y Autenticación
+
+### Dashboard
 **Archivo:** `dashboard.php`
 **Base de datos:** `db_docines`, `db_plusmovie`, `db_dooplex`
 
@@ -29,6 +31,32 @@ Devuelve conteos para mostrar en el dashboard.
               "series": 90,
               "animes": 40
           }
+      }
+  }
+  ```
+
+### Login Dooplex
+**Archivo:** `login_dooplex.php`
+**Base de datos:** `db_dooplex` (Tabla `users`)
+
+Autenticación de administradores con contraseña cifrada en formato bcrypt (`$2y$...`).
+- **Método:** `POST`
+- **Endpoint:** `/login_dooplex.php`
+- **Cuerpo (JSON o Form):**
+  ```json
+  {
+      "email": "admin@example.com",
+      "password": "mi_password_secreto"
+  }
+  ```
+- **Responde (200):**
+  ```json
+  {
+      "success": true,
+      "message": "Login correcto",
+      "data": {
+          "username": "Admin",
+          "role": "admin"
       }
   }
   ```
@@ -364,17 +392,22 @@ Actualiza campos del episodio en la tabla `anime_episodes` por `id`, usando el p
 #### Obtener videos del episodio
 - **Método:** `GET`
 - **Endpoint:** `/anime_dooplex.php?anime_episode_id={anime_episode_id}`
-- **Responde:** Retorna `id`, `server`, `header`, `link`, `lang` desde la tabla `anime_videos`.
+- **Responde:** Retorna `id`, `anime_episode_id`, `server`, `header`, `link`, `lang`, `embed`, `youtubelink`, `hls`, `supported_hosts` desde la tabla `anime_videos`.
   - **Ejemplo de Respuesta:**
     ```json
     {
         "data": [
             {
                 "id": 5,
-                "server": "Mega",
-                "header": "AuthToken123",
-                "link": "https://mega.nz/file/...",
-                "lang": "Latino"
+                "anime_episode_id": 55,
+                "server": "StreamWish",
+                "header": "StreamWish",
+                "link": "https://streamwish.fun/e/rsuwxo6we8sz",
+                "lang": "CAST",
+                "embed": "0",
+                "youtubelink": "0",
+                "hls": "0",
+                "supported_hosts": "1"
             }
         ]
     }
@@ -387,13 +420,16 @@ Actualiza campos del episodio en la tabla `anime_episodes` por `id`, usando el p
   ```json
   {
       "anime_episode_id": 55,
-      "server": "Mega",
-      "header": "AuthToken123",
-      "link": "https://mega.nz/file/...",
-      "lang": "Latino"
+      "server": "StreamWish",
+      "header": "StreamWish",
+      "link": "https://streamwish.fun/e/rsuwxo6we8sz",
+      "lang": "CAST",
+      "embed": "0",
+      "youtubelink": "0",
+      "hls": "0",
+      "supported_hosts": "1"
   }
   ```
-- **Valores predeterminados (internos):** `embed = 1`.
 - **Autogenerado:** `created_at`, `updated_at` con formato `YYYY-MM-DD HH:MM:SS`.
 - **Responde:**
   - **Ejemplo de Respuesta:**
@@ -415,11 +451,14 @@ Actualiza campos del episodio en la tabla `anime_episodes` por `id`, usando el p
   ```json
   {
       "id": 99,
-      "anime_episode_id": 55,
-      "server": "Mediafire",
-      "header": "AuthToken123",
-      "link": "https://mediafire.com/file/...",
-      "lang": "Subtitulado"
+      "server": "StreamWish",
+      "header": "StreamWish",
+      "link": "https://streamwish.fun/e/rsuwxo6we8sz",
+      "lang": "CAST",
+      "embed": "0",
+      "youtubelink": "0",
+      "hls": "0",
+      "supported_hosts": "1"
   }
   ```
 - **Autogenerado:** `updated_at` con formato `YYYY-MM-DD HH:MM:SS`.

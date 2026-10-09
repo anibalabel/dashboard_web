@@ -1,7 +1,7 @@
 <?php
 // Configuración de la base de datos DOOPLEX
 define('DOOPLEX_DB_CONNECTION', 'mysql');
-define('DOOPLEX_DB_HOST', 'mysql.us.cloudlogin.co');
+define('DOOPLEX_DB_HOST', 'localhost'); // mysql.us.cloudlogin.co
 define('DOOPLEX_DB_PORT', 3306);
 define('DOOPLEX_DB_DATABASE', 'plusmovie_st');
 define('DOOPLEX_DB_USERNAME', 'plusmovie_st');

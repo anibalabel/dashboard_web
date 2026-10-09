@@ -162,6 +162,7 @@ export default function UrlsDooplex() {
         [episodeId]: prev[episodeId].map(v => v.id === editingId ? { ...v, ...editForm } as DooplexVideo : v)
       }));
       setEditingId(null);
+      showSnackbar('Video actualizado correctamente', 'success');
     } catch {
       showSnackbar('Error al actualizar el video', 'error');
     }
@@ -396,7 +397,10 @@ export default function UrlsDooplex() {
                                     <div className="sm:col-span-2">
                                       <select
                                         value={editForm.server}
-                                        onChange={(e) => setEditForm({...editForm, server: e.target.value})}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          setEditForm({ ...editForm, server: value, header: value });
+                                        }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
                                         {SERVER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -407,7 +411,7 @@ export default function UrlsDooplex() {
                                         value={editForm.header || ''}
                                         onChange={(e) => {
                                           const value = e.target.value;
-                                          setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                                          setEditForm({ ...editForm, header: value, server: value });
                                         }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >

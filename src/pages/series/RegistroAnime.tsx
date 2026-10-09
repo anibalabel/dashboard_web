@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Loader2, PlayCircle, Search } from 'lucide-react';
 import { getDooplexAnime, getDooplexAnimeEpisodes, getDooplexAnimeSeasons, registerDooplexAnimeEpisodeVideo } from '../../services/api';
 import { DooplexAnime, DooplexAnimeEpisode, DooplexAnimeSeason } from '../../types';
-import { HEADER_OPTIONS, LANG_OPTIONS, SERVER_OPTIONS } from '../../lib/constants';
+import { HEADER_OPTIONS, LANG_OPTIONS, SERVER_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
 
 export default function RegistroAnime() {
   const [tmdbId, setTmdbId] = useState('');
@@ -17,9 +17,10 @@ export default function RegistroAnime() {
   const [selectedStartEpisodeId, setSelectedStartEpisodeId] = useState<number | ''>('');
 
   const [urls, setUrls] = useState('');
-  const [server, setServer] = useState('1080P');
-  const [header, setHeader] = useState('');
+  const [server, setServer] = useState('Otros');
+  const [header, setHeader] = useState('Otros');
   const [lang, setLang] = useState('LAT');
+  const [source, setSource] = useState('embed');
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [progress, setProgress] = useState<{
@@ -155,12 +156,20 @@ export default function RegistroAnime() {
       }
 
       try {
+        const sourceFlags = {
+          embed: source === 'embed' ? '1' : '0',
+          youtubelink: source === 'youtubelink' ? '1' : '0',
+          hls: source === 'hls' ? '1' : '0',
+          supported_hosts: source === 'supported_hosts' ? '1' : '0'
+        };
+
         await registerDooplexAnimeEpisodeVideo({
           anime_episode_id: currentEpisode.id,
           server,
           header,
           link: currentUrl,
-          lang
+          lang,
+          ...sourceFlags
         });
 
         setProgress((prev) => ({
@@ -267,12 +276,16 @@ export default function RegistroAnime() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Calidad</label>
                     <select
                       value={server}
-                      onChange={(e) => setServer(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setServer(val);
+                        setHeader(val);
+                      }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {SERVER_OPTIONS.map((o) => (
@@ -287,11 +300,11 @@ export default function RegistroAnime() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
                     <select
                       value={header}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setHeader(value);
-                      if (value) setServer(value);
-                    }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setHeader(val);
+                        setServer(val);
+                      }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {HEADER_OPTIONS.map((o) => (
@@ -310,6 +323,21 @@ export default function RegistroAnime() {
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {LANG_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                    <select
+                      value={source}
+                      onChange={(e) => setSource(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                    >
+                      {SOURCE_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>

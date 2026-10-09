@@ -17,8 +17,8 @@ export default function DooplexRMovie() {
   const [dooplexData, setDooplexData] = useState<DooplexMovie | null>(null);
 
   // Form Data - Dooplex
-  const [dooplexQuality, setDooplexQuality] = useState('1080P');
-  const [dooplexHeader, setDooplexHeader] = useState('');
+  const [dooplexQuality, setDooplexQuality] = useState('Otros');
+  const [dooplexHeader, setDooplexHeader] = useState('Otros');
   const [dooplexLang, setDooplexLang] = useState('LAT');
   const [dooplexSource, setDooplexSource] = useState('embed');
 
@@ -271,7 +271,11 @@ export default function DooplexRMovie() {
                   </label>
                   <select
                     value={dooplexQuality}
-                    onChange={(e) => setDooplexQuality(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDooplexQuality(val);
+                      setDooplexHeader(val);
+                    }}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm"
                   >
                     {SERVER_OPTIONS.map((opt) => (
@@ -289,7 +293,11 @@ export default function DooplexRMovie() {
                   </label>
                   <select
                     value={dooplexHeader}
-                    onChange={(e) => setDooplexHeader(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDooplexHeader(val);
+                      setDooplexQuality(val);
+                    }}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm"
                   >
                     {HEADER_OPTIONS.map((opt) => (

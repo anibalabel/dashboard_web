@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, CheckCircle, Check } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
+import { parseAndDecryptEmbed69, extractCleanUrlFromEmbedLink } from '@/lib/embed69Utils';
 
 interface ScrapedResult {
   lat?: string | null;
@@ -121,31 +122,99 @@ export default function ScraperMoviesPelisplus() {
             addLog(`La variable "video[1]" NO existe en el HTML descargado`);
           }
 
-          if (targetServer === 'uqload') {
-            addLog(`Buscando enlace de redirección xupalace para Uqload...`);
-            const uqlinkMatch = normalizedHtml.match(/(https?:\/\/xupalace\.org\/uqlink\.php\?id=[a-zA-Z0-9]+)/i);
+          if (targetServer.toLowerCase() === 'uqload') {
+            addLog(`Buscando enlace de redirección / iframe para Uqload...`);
             
-            if (!uqlinkMatch) {
-              addLog(`No se encontró enlace de redirección xupalace en la película`, true);
-              throw new Error('Enlace de redirección no encontrado');
-            }
-            
-            const uqlinkUrl = uqlinkMatch[1];
-            addLog(`Redirección de Uqload encontrada: ${uqlinkUrl}. Descargando iframe...`);
-            
-            const uqHtml = await fetchHTML(uqlinkUrl, url);
-            
-            let uqloadEmbedUrl = '';
-            const iframeMatch = uqHtml.match(/<iframe[^>]+src=['"]([^'"]*uqload[^'"]*)['"]/i);
-            if (iframeMatch) {
-              uqloadEmbedUrl = iframeMatch[1];
-            } else {
-              const directMatch = uqHtml.match(/(https?:\/\/uqload\.[a-z]+\/embed-[a-zA-Z0-9._-]+\.html)/i);
-              if (directMatch) {
-                uqloadEmbedUrl = directMatch[1];
+            let uqlinkUrl = '';
+            let directUqloadUrl = '';
+
+            // 1. Buscar en variables video[N]
+            const videoMatches = Array.from(normalizedHtml.matchAll(/video\[(\d+)\]\s*=\s*['"]([^'"]+)['"]/gi));
+            for (const match of videoMatches) {
+              const vUrl = match[2].trim();
+              if (/uqlink\.php\?id=/i.test(vUrl)) {
+                uqlinkUrl = vUrl;
+                break;
+              }
+              if (/uqload\.[a-z0-9]+/i.test(vUrl)) {
+                directUqloadUrl = vUrl;
+                break;
               }
             }
-            
+
+            // 2. Si hay tabs de servidor, buscar si Uqload está en alguna pestaña específica
+            if (!uqlinkUrl && !directUqloadUrl) {
+              const uqTabMatch = normalizedHtml.match(/<li[^>]*data-id=['"]?(\d+)['"]?[^>]*>\s*<a[^>]*>(?:Uqload|Uq)[^<]*<\/a>/i);
+              if (uqTabMatch) {
+                const tabId = uqTabMatch[1];
+                const videoTabMatch = normalizedHtml.match(new RegExp(`video\\[${tabId}\\]\\s*=\\s*['"]([^'"]+)['"]`, 'i'));
+                if (videoTabMatch) {
+                  const vUrl = videoTabMatch[1].trim();
+                  if (/uqlink\.php\?id=/i.test(vUrl)) {
+                    uqlinkUrl = vUrl;
+                  } else if (/uqload\.[a-z0-9]+/i.test(vUrl)) {
+                    directUqloadUrl = vUrl;
+                  }
+                }
+              }
+            }
+
+            // 3. Buscar en todo el HTML si no se encontró en video[N]
+            if (!uqlinkUrl && !directUqloadUrl) {
+              const uqlinkMatch = normalizedHtml.match(/(https?:\/\/[^\s'"`<>]+\/uqlink\.php\?id=[a-zA-Z0-9_-]+)/i) ||
+                                  normalizedHtml.match(/(\/\/[^\s'"`<>]+\/uqlink\.php\?id=[a-zA-Z0-9_-]+)/i) ||
+                                  normalizedHtml.match(/(\/uqlink\.php\?id=[a-zA-Z0-9_-]+)/i);
+              if (uqlinkMatch) {
+                uqlinkUrl = uqlinkMatch[1];
+              }
+            }
+
+            if (!uqlinkUrl && !directUqloadUrl) {
+              const directMatch = normalizedHtml.match(/(https?:\/\/uqload\.[a-z0-9]+\/(?:embed-|e\/)?[a-zA-Z0-9._-]+\.html)/i) ||
+                                  normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*uqload[^'"]*)['"]/i);
+              if (directMatch) {
+                directUqloadUrl = directMatch[1];
+              }
+            }
+
+            let uqloadEmbedUrl = directUqloadUrl;
+
+            if (uqlinkUrl) {
+              if (uqlinkUrl.startsWith('//')) {
+                uqlinkUrl = 'https:' + uqlinkUrl;
+              } else if (uqlinkUrl.startsWith('/')) {
+                uqlinkUrl = 'https://embed69.org' + uqlinkUrl;
+              }
+
+              addLog(`Redirección de Uqload encontrada: ${uqlinkUrl}. Descargando iframe...`);
+              
+              try {
+                const uqHtml = await fetchHTML(uqlinkUrl, url);
+                
+                const iframeMatch = uqHtml.match(/<iframe[^>]+src=['"]([^'"]*uqload[^'"]*)['"]/i);
+                if (iframeMatch) {
+                  uqloadEmbedUrl = iframeMatch[1];
+                } else {
+                  const directMatch = uqHtml.match(/(https?:\/\/uqload\.[a-z0-9]+\/(?:embed-|e\/)?[a-zA-Z0-9._-]+\.html)/i) ||
+                                      uqHtml.match(/<iframe[^>]+src=['"]([^'"]+)['"]/i);
+                  if (directMatch) {
+                    uqloadEmbedUrl = directMatch[1];
+                  }
+                }
+              } catch (e) {
+                console.warn('Error al descargar HTML de uqlink:', e);
+              }
+
+              // Fallback directo por ID si no se pudo extraer el iframe del HTML de redirección
+              if (!uqloadEmbedUrl) {
+                const idMatch = uqlinkUrl.match(/id=([a-zA-Z0-9_-]+)/i);
+                if (idMatch && idMatch[1]) {
+                  uqloadEmbedUrl = `https://uqload.vc/embed-${idMatch[1]}.html`;
+                  addLog(`Iframe Uqload generado a partir del ID: ${uqloadEmbedUrl}`);
+                }
+              }
+            }
+
             if (uqloadEmbedUrl) {
               if (uqloadEmbedUrl.startsWith('//')) {
                 uqloadEmbedUrl = 'https:' + uqloadEmbedUrl;
@@ -153,15 +222,14 @@ export default function ScraperMoviesPelisplus() {
               const formattedUrl = formatDoodstreamUrl(uqloadEmbedUrl, targetServer);
               finalResults.push({ lat: formattedUrl });
               addLog(`Éxito (uqload) - LAT: ${formattedUrl}`);
+              
+              setResults(finalResults);
+              addLog('Extracción finalizada exitosamente.');
+              setIsScraping(false);
+              return;
             } else {
-              addLog(`No se encontró el iframe de Uqload en la redirección`, true);
-              throw new Error('Iframe de Uqload no encontrado');
+              addLog(`No se encontró enlace directo de Uqload en la película, buscando en Embed69...`);
             }
-            
-            setResults(finalResults);
-            addLog('Extracción finalizada exitosamente.');
-            setIsScraping(false);
-            return;
           }
 
           // Buscar la variable JavaScript que contiene el iframe de embed69
@@ -256,23 +324,20 @@ export default function ScraperMoviesPelisplus() {
         // Petición al iframe de embed69 (necesita referer de pelisplus para evitar 403 Forbidden)
         const iframeHtml = await fetchHTML(embedUrl, url);
 
-        // Buscar el JSON de data (puede estar en let dataLink = o let sortedEmbeds =)
-        const dataMatch = iframeHtml.match(/let\s+dataLink\s*=\s*(\[.*?\]);/s) || 
-                          iframeHtml.match(/let\s+sortedEmbeds\s*=\s*(\[.*?\]);/s) ||
-                          iframeHtml.match(/(?:const\s+data|var\s+dataLink)\s*=\s*(\[.*?\]);/s);
+        const parsedData = await parseAndDecryptEmbed69(iframeHtml, () => {
+          addLog(`Verificando encriptación PoW + AES...`);
+        });
 
-        if (!dataMatch) {
+        if (!parsedData || parsedData.length === 0) {
           addLog(`No se encontraron datos JSON en Embed69`, true);
           throw new Error('Datos JSON no encontrados en Embed69');
         }
-
-        const parsedData = new Function(`return ${dataMatch[1]}`)();
 
         let latUrl = null;
         let castUrl = null;
         let subUrl = null;
 
-        // El formato de dataLink es: [{ file_id: X, video_language: "ESP", sortedEmbeds: [{servername: "voe", link: "JWT"}, ...] }]
+        // El formato de dataLink es: [{ file_id: X, video_language: "ESP", sortedEmbeds: [{servername: "voe", link: "..."}, ...] }]
         // Iteramos sobre los objetos principales de idioma
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const langGroup of parsedData) {
@@ -288,41 +353,30 @@ export default function ScraperMoviesPelisplus() {
              if (String(server.servername).toLowerCase() !== targetServer.toLowerCase()) continue;
              
              try {
-                // Decodificar JWT token
-                const parts = server.link.split('.');
-                if (parts.length === 3) {
-                   // Fix base64 padding issues
-                   const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-                   const pad = base64Url.length % 4;
-                   const padded = pad ? base64Url + '='.repeat(4 - pad) : base64Url;
+                let cleanUrl = extractCleanUrlFromEmbedLink(server.link);
+                if (cleanUrl) {
+                   // Resolve Streamwish redirects
+                   if (String(server.servername).toLowerCase() === 'streamwish') {
+                       addLog(`Resolviendo redirección de Streamwish...`);
+                       cleanUrl = await resolveRedirect(cleanUrl);
+                   }
                    
-                   const payload = JSON.parse(atob(padded));
-                   if (payload.link) {
-                      let cleanUrl = payload.link.replace(/`/g, '').trim();
-                      
-                      // Resolve Streamwish redirects
-                      if (String(server.servername).toLowerCase() === 'streamwish') {
-                          addLog(`Resolviendo redirección de Streamwish...`);
-                          cleanUrl = await resolveRedirect(cleanUrl);
-                      }
-                      
-                      cleanUrl = formatDoodstreamUrl(cleanUrl, targetServer || server.servername);
-                      
-                      // Clasificar por idioma basado en video_language
-                      if (langName === 'LAT' || langName === 'LATINO') {
-                        if (!latUrl) latUrl = cleanUrl;
-                      } else if (langName === 'ESP' || langName === 'CASTELLANO') {
-                        if (!castUrl) castUrl = cleanUrl;
-                      } else if (langName === 'SUB' || langName === 'SUBTITULADO') {
-                        if (!subUrl) subUrl = cleanUrl;
-                      } else {
-                        // Fallback si no identificamos
-                        if (!latUrl) latUrl = cleanUrl;
-                      }
+                   cleanUrl = formatDoodstreamUrl(cleanUrl, targetServer || server.servername);
+                   
+                   // Clasificar por idioma basado en video_language
+                   if (langName === 'LAT' || langName === 'LATINO') {
+                     if (!latUrl) latUrl = cleanUrl;
+                   } else if (langName === 'ESP' || langName === 'CASTELLANO') {
+                     if (!castUrl) castUrl = cleanUrl;
+                   } else if (langName === 'SUB' || langName === 'SUBTITULADO') {
+                     if (!subUrl) subUrl = cleanUrl;
+                   } else {
+                     // Fallback si no identificamos
+                     if (!latUrl) latUrl = cleanUrl;
                    }
                 }
              } catch (e) {
-                console.error("Error decodificando token", e);
+                console.error("Error procesando enlace de servidor", e);
              }
            }
         }
@@ -441,6 +495,7 @@ export default function ScraperMoviesPelisplus() {
                   <option value="voe">Voe</option>
                   <option value="filemoon">Filemoon</option>
                   <option value="streamwish">Streamwish</option>
+                  <option value="earnvids">EarnVids</option>
                   <option value="vidhide">Vidhide</option>
                   <option value="uqload">Uqload</option>
                 </select>

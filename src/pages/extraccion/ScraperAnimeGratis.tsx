@@ -244,6 +244,7 @@ export default function ScraperAnimeGratis() {
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 bg-white"
                   >
                     <option value="TODOS">Todos</option>
+                    <option value="EARNVIDS">EarnVids</option>
                     <option value="DOODSTREAM">Doodstream</option>
                     <option value="MEGA">Mega</option>
                     <option value="STREAMTAPE">Streamtape</option>

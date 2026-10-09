@@ -16,53 +16,46 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-require_once __DIR__ . '/db_docines/Database.php';
-require_once __DIR__ . '/db_plusmovie/Database.php';
 require_once __DIR__ . '/db_dooplex/Database.php';
 
-function getCount(PDO $conn, string $sql, array $params = []): int {
-    $stmt = $conn->prepare($sql);
-    foreach ($params as $key => $value) {
-        $stmt->bindValue($key, $value);
+function getCount(PDO $conn, string $sql): int {
+    try {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)($row['total'] ?? 0);
+    } catch (Exception $e) {
+        return 0;
     }
-    $stmt->execute();
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return (int)($row['total'] ?? 0);
 }
 
 try {
-    $docinesDb = new DocinesDatabase();
-    $docinesConn = $docinesDb->connect();
-
-    $plusMovieDb = new PlusMovieDatabase();
-    $plusMovieConn = $plusMovieDb->connect();
-
     $dooplexDb = new DooplexDatabase();
     $dooplexConn = $dooplexDb->connect();
 
+    $moviesCount = getCount($dooplexConn, "SELECT COUNT(*) AS total FROM movies");
+    $seriesCount = getCount($dooplexConn, "SELECT COUNT(*) AS total FROM series");
+    $animesCount = getCount($dooplexConn, "SELECT COUNT(*) AS total FROM animes");
+
     $data = [
-        'docines' => [
-            'series' => getCount($docinesConn, "SELECT COUNT(*) AS total FROM web_series"),
-            'movies' => getCount($docinesConn, "SELECT COUNT(*) AS total FROM movies")
-        ],
-        'plusmovie' => [
-            'movies' => getCount($plusMovieConn, "SELECT COUNT(*) AS total FROM videos WHERE is_tvseries = :is_tvseries", [':is_tvseries' => 0]),
-            'series' => getCount($plusMovieConn, "SELECT COUNT(*) AS total FROM videos WHERE is_tvseries = :is_tvseries", [':is_tvseries' => 1])
-        ],
         'dooplex' => [
-            'movies' => getCount($dooplexConn, "SELECT COUNT(*) AS total FROM movies"),
-            'series' => getCount($dooplexConn, "SELECT COUNT(*) AS total FROM series"),
-            'animes' => getCount($dooplexConn, "SELECT COUNT(*) AS total FROM animes")
+            'movies' => $moviesCount,
+            'series' => $seriesCount,
+            'animes' => $animesCount
         ]
     ];
 
-    echo json_encode(['success' => true, 'data' => $data]);
+    echo json_encode([
+        'success' => true,
+        'data' => $data
+    ]);
 
-    $docinesDb->closeConnection();
-    $plusMovieDb->closeConnection();
     $dooplexDb->closeConnection();
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error al generar dashboard: ' . $e->getMessage()]);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error al conectar a la base de datos Dooplex: ' . $e->getMessage()
+    ]);
 }
 ?>

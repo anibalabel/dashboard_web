@@ -53,8 +53,8 @@ export default function RegistroDoble() {
 
   // Form Data
   const [urls, setUrls] = useState('');
-  const [dooplexQuality, setDooplexQuality] = useState('1080P');
-  const [dooplexHeader, setDooplexHeader] = useState('');
+  const [dooplexQuality, setDooplexQuality] = useState('Otros');
+  const [dooplexHeader, setDooplexHeader] = useState('Otros');
   const [dooplexLang, setDooplexLang] = useState('CAST');
   const [dooplexSource, setDooplexSource] = useState('embed');
 
@@ -499,7 +499,11 @@ export default function RegistroDoble() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Calidad (Server)</label>
                     <select
                       value={dooplexQuality}
-                      onChange={(e) => setDooplexQuality(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDooplexQuality(val);
+                        setDooplexHeader(val);
+                      }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {SERVER_OPTIONS.map((opt) => (
@@ -511,11 +515,11 @@ export default function RegistroDoble() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
                     <select
                       value={dooplexHeader}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setDooplexHeader(value);
-                      if (value) setDooplexQuality(value);
-                    }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDooplexHeader(val);
+                        setDooplexQuality(val);
+                      }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
                       {HEADER_OPTIONS.map((opt) => (

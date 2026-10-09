@@ -127,13 +127,23 @@ export default function ScraperAnimeOnlineNinja() {
             let castUrl = null;
             let subUrl = null;
 
+            const matchesTargetServer = (spanText?: string | null) => {
+              if (!spanText) return false;
+              const s = spanText.trim().toUpperCase();
+              const t = targetServer.trim().toUpperCase();
+              if (s === t) return true;
+              if (t === 'EARNVIDS' && (s.includes('EARN') || s.includes('SMOOTH'))) return true;
+              if (t === 'STREAMWISH' && (s.includes('WISH') || s.includes('STREAMWISH'))) return true;
+              return s.includes(t);
+            };
+
             // Buscar contenedor Latino
             const latContainer = doc.querySelector('.OD_LAT');
             if (latContainer) {
                 const servers = Array.from(latContainer.querySelectorAll('li'));
                 for (const server of servers) {
                     const span = server.querySelector('span');
-                    if (span && span.textContent?.trim().toUpperCase() === targetServer.toUpperCase()) {
+                    if (span && matchesTargetServer(span.textContent)) {
                         const onclick = server.getAttribute('onclick');
                         const match = onclick?.match(/go_to_player\(['"]([^'"]+)['"]\)/);
                         if (match) {
@@ -150,7 +160,7 @@ export default function ScraperAnimeOnlineNinja() {
                 const servers = Array.from(castContainer.querySelectorAll('li'));
                 for (const server of servers) {
                     const span = server.querySelector('span');
-                    if (span && span.textContent?.trim().toUpperCase() === targetServer.toUpperCase()) {
+                    if (span && matchesTargetServer(span.textContent)) {
                         const onclick = server.getAttribute('onclick');
                         const match = onclick?.match(/go_to_player\(['"]([^'"]+)['"]\)/);
                         if (match) {
@@ -167,7 +177,7 @@ export default function ScraperAnimeOnlineNinja() {
                  const servers = Array.from(subContainer.querySelectorAll('li'));
                  for (const server of servers) {
                      const span = server.querySelector('span');
-                     if (span && span.textContent?.trim().toUpperCase() === targetServer.toUpperCase()) {
+                     if (span && matchesTargetServer(span.textContent)) {
                          const onclick = server.getAttribute('onclick');
                          const match = onclick?.match(/go_to_player\(['"]([^'"]+)['"]\)/);
                          if (match) {

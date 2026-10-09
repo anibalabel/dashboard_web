@@ -10,6 +10,7 @@ import RegistroAnime from "@/pages/series/RegistroAnime";
 import UrlsAnime from "@/pages/series/UrlsAnime";
 import UrlsAnimeUpdate from "@/pages/series/UrlsAnimeUpdate";
 import UrlsDooplex from "@/pages/series/UrlsDooplex";
+import UrlsDooplexUpdate from "@/pages/series/UrlsDooplexUpdate";
 import UrlsPlusmovie from "@/pages/series/UrlsPlusmovie";
 import UrlsDocines from "@/pages/series/UrlsDocines";
 import UrlsDocinesUpdate from "@/pages/series/UrlsDocinesUpdate";
@@ -37,11 +38,13 @@ import ScraperSeriesLySeries from "@/pages/extraccion/ScraperSeriesLySeries";
 import DoodStream from "@/pages/servidores/DoodStream";
 import Supervideo from "@/pages/servidores/Supervideo";
 import Byse from "@/pages/servidores/Byse";
+import Vidara from "@/pages/servidores/Vidara";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import VersionApp from "@/pages/VersionApp";
 import UqloadMod from "@/pages/herramientas/UqloadMod";
 import UrlsMod from "@/pages/herramientas/UrlsMod";
 import Dominios from "@/pages/herramientas/Dominios";
+import StreamwishMod from "@/pages/herramientas/StreamwishMod";
 import Snackbar from "@/components/Snackbar";
 
 export default function App() {
@@ -63,6 +66,7 @@ export default function App() {
           <Route path="/series/urls-anime-update" element={<UrlsAnimeUpdate />} />
           <Route path="/series/urls-plusmovie" element={<UrlsPlusmovie />} />
           <Route path="/series/urls-dooplex" element={<UrlsDooplex />} />
+          <Route path="/series/urls-dooplex-update" element={<UrlsDooplexUpdate />} />
           <Route path="/series/urls-docines" element={<UrlsDocines />} />
           <Route path="/series/urls-docines-update" element={<UrlsDocinesUpdate />} />
           <Route path="/movies/registro-multiple" element={<RegistroMultiplePeliculas />} />
@@ -89,9 +93,12 @@ export default function App() {
           <Route path="/servidores/doodstream" element={<DoodStream />} />
           <Route path="/servidores/supervideo" element={<Supervideo />} />
           <Route path="/servidores/byse" element={<Byse />} />
+          <Route path="/servidores/vidara" element={<Vidara />} />
+          <Route path="/servidores/streamwish" element={<StreamwishMod />} />
           <Route path="/herramientas/uqload-mod" element={<UqloadMod />} />
           <Route path="/herramientas/urls-mod" element={<UrlsMod />} />
           <Route path="/herramientas/dominios" element={<Dominios />} />
+          <Route path="/herramientas/streamwish-mod" element={<StreamwishMod />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

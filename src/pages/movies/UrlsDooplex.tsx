@@ -148,6 +148,7 @@ export default function UrlsDooplexPeliculas() {
       );
       setEditingId(null);
       setEditForm({});
+      showSnackbar('Video actualizado correctamente', 'success');
     } catch {
       showSnackbar('Error al actualizar el video', 'error');
     }
@@ -301,7 +302,10 @@ export default function UrlsDooplexPeliculas() {
                             <label className="block text-xs font-medium text-gray-500 mb-1">Calidad (Server)</label>
                             <select
                               value={editForm.server || ''}
-                              onChange={(e) => setEditForm({ ...editForm, server: e.target.value })}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setEditForm({ ...editForm, server: value, header: value });
+                              }}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >
                               {SERVER_OPTIONS.map((opt) => (
@@ -315,7 +319,7 @@ export default function UrlsDooplexPeliculas() {
                               value={editForm.header || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                setEditForm({ ...editForm, header: value, server: value || editForm.server });
+                                setEditForm({ ...editForm, header: value, server: value });
                               }}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >

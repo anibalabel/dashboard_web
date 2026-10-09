@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { 
-  DashboardResponse, 
-  LoginCredentials, 
+import {
+  DashboardResponse,
+  LoginCredentials,
   LoginResponse,
   DooplexSerie,
   DooplexSeason,
@@ -47,7 +47,7 @@ import {
   ApiResponse
 } from '../types';
 
-const BASE_URL = 'https://api.docines.xyz';
+const BASE_URL = 'https://app.movflix.live';
 
 export const fetchDashboardStats = async (): Promise<DashboardResponse> => {
   try {
@@ -61,7 +61,7 @@ export const fetchDashboardStats = async (): Promise<DashboardResponse> => {
 
 export const loginAdmin = async (credentials: LoginCredentials): Promise<LoginResponse> => {
   try {
-    const response = await axios.post<LoginResponse>(`${BASE_URL}/login_plusmovie.php`, credentials, {
+    const response = await axios.post<LoginResponse>(`${BASE_URL}/login_dooplex.php`, credentials, {
       headers: {
         'Content-Type': 'application/json'
       }

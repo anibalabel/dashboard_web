@@ -24,7 +24,9 @@ const SERVER_MAP: Record<string, string> = {
   'gumlet.io': 'Gumlet',
   'anime.p2pstream.vip': 'P2PStream',
   'anime.upns.pro': 'Upns',
-  'burstcloud.co': 'Burstcloud'
+  'burstcloud.co': 'Burstcloud',
+  'earnvids': 'EarnVids',
+  'smoothpre': 'EarnVids'
 };
 
 export default function ScraperAnimeJL() {

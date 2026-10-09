@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { PlatformCard } from '../components/PlatformCard';
+import { RefreshCw, Film, Tv, Zap } from 'lucide-react';
 import { DashboardChart } from '../components/DashboardChart';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
@@ -17,10 +16,10 @@ export default function Home() {
     setError(null);
     try {
       const response = await fetchDashboardStats();
-      if (response.success) {
+      if (response && response.success && response.data?.dooplex) {
         setData(response.data);
       } else {
-        setError('La API respondió pero indicó un error.');
+        setError(response?.error || 'No se pudieron cargar los datos de Dooplex.');
       }
     } catch {
       setError('Error al cargar los datos del dashboard. Por favor, intente nuevamente.');
@@ -36,7 +35,10 @@ export default function Home() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-xl font-semibold text-gray-800">Resumen General</h2>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard Dooplex</h1>
+          <p className="text-sm text-gray-500">Resumen y estado de contenido activo</p>
+        </div>
         <button 
           onClick={loadData}
           disabled={loading}
@@ -53,22 +55,54 @@ export default function Home() {
         <ErrorMessage message={error} onRetry={loadData} />
       ) : data ? (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <PlatformCard 
-              title="Docines" 
-              stats={data.docines} 
-              colorTheme="blue"
-            />
-            <PlatformCard 
-              title="Plusmovie" 
-              stats={data.plusmovie} 
-              colorTheme="purple"
-            />
-            <PlatformCard 
-              title="Dooplex" 
-              stats={data.dooplex} 
-              colorTheme="emerald"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Películas */}
+            <div className="bg-white rounded-xl border border-indigo-100 p-6 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">
+                  Películas
+                </span>
+                <div className="text-3xl font-extrabold text-gray-900 pt-2">
+                  {data.dooplex.movies?.toLocaleString() || 0}
+                </div>
+                <p className="text-xs text-gray-400">Total en Dooplex</p>
+              </div>
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Film className="h-7 w-7" />
+              </div>
+            </div>
+
+            {/* Series */}
+            <div className="bg-white rounded-xl border border-rose-100 p-6 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full">
+                  Series
+                </span>
+                <div className="text-3xl font-extrabold text-gray-900 pt-2">
+                  {data.dooplex.series?.toLocaleString() || 0}
+                </div>
+                <p className="text-xs text-gray-400">Total en Dooplex</p>
+              </div>
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                <Tv className="h-7 w-7" />
+              </div>
+            </div>
+
+            {/* Animes */}
+            <div className="bg-white rounded-xl border border-amber-100 p-6 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full">
+                  Animes
+                </span>
+                <div className="text-3xl font-extrabold text-gray-900 pt-2">
+                  {data.dooplex.animes?.toLocaleString() || 0}
+                </div>
+                <p className="text-xs text-gray-400">Total en Dooplex</p>
+              </div>
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                <Zap className="h-7 w-7" />
+              </div>
+            </div>
           </div>
 
           <DashboardChart data={data} />

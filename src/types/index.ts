@@ -15,14 +15,15 @@ export interface DooplexStats {
 }
 
 export interface DashboardData {
-  docines: DocinesStats;
-  plusmovie: PlusmovieStats;
   dooplex: DooplexStats;
+  docines?: DocinesStats;
+  plusmovie?: PlusmovieStats;
 }
 
 export interface DashboardResponse {
   success: boolean;
   data: DashboardData;
+  error?: string;
 }
 
 export interface User {
@@ -184,6 +185,10 @@ export interface DooplexAnimeRegisterPayload {
   header: string;
   link: string;
   lang: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface DooplexAnimeVideo {
@@ -192,6 +197,10 @@ export interface DooplexAnimeVideo {
   header: string;
   link: string;
   lang: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 export interface DooplexAnimeVideoUpdatePayload {
@@ -201,6 +210,10 @@ export interface DooplexAnimeVideoUpdatePayload {
   header?: string;
   link?: string;
   lang?: string;
+  embed?: string | number;
+  youtubelink?: string | number;
+  hls?: string | number;
+  supported_hosts?: string | number;
 }
 
 // --- Docines Interfaces ---

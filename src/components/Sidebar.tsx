@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { LayoutDashboard, Clapperboard, Film, FileVideo, ChevronDown, ChevronRight, ListVideo, DownloadCloud, Smartphone, Wrench, Link as LinkIcon, Globe } from 'lucide-react';
+import { LayoutDashboard, Clapperboard, Film, FileVideo, ChevronDown, ChevronRight, ListVideo, DownloadCloud, Smartphone, Wrench, Link as LinkIcon, Globe, Flame, CloudUpload } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 interface SidebarProps {
@@ -79,54 +79,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
             {isSeriesOpen && (
               <div className="mt-1 ml-4 pl-4 border-l border-gray-200 space-y-1">
                 <Link
-                  to="/series/registro-docines"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/registro-docines'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Film className="h-4 w-4" />
-                  Registro Docines
-                </Link>
-                <Link
-                  to="/series/registro-doble"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/registro-doble' && !isPlusmovieSeriesRActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Clapperboard className="h-4 w-4" />
-                  Registro Doble
-                </Link>
-                <Link
-                  to="/series/registro-doble?mode=plusmovie"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isPlusmovieSeriesRActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Clapperboard className="h-4 w-4" />
-                  Registro Plusmovie
-                </Link>
-                <Link
-                  to="/series/registro-doble-update"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/registro-doble-update'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Clapperboard className="h-4 w-4" />
-                  Registro Doble Update
-                </Link>
-                <Link
                   to="/series/registro-dooplex"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -151,18 +103,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Registro Anime
                 </Link>
                 <Link
-                  to="/series/urls-plusmovie"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/urls-plusmovie'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Urls Series Plusmovie
-                </Link>
-                <Link
                   to="/series/urls-dooplex"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -173,6 +113,18 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                 >
                   <ListVideo className="h-4 w-4" />
                   Urls Series Dooplex
+                </Link>
+                <Link
+                  to="/series/urls-dooplex-update"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/series/urls-dooplex-update'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <ListVideo className="h-4 w-4" />
+                  Update Episodios Series
                 </Link>
                 <Link
                   to="/series/urls-anime"
@@ -197,30 +149,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                 >
                   <ListVideo className="h-4 w-4" />
                   Update Episodios Anime
-                </Link>
-                <Link
-                  to="/series/urls-docines"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/urls-docines'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Urls Series Docines
-                </Link>
-                <Link
-                  to="/series/urls-docines-update"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/series/urls-docines-update'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Update Episodios Docines
                 </Link>
               </div>
             )}
@@ -249,18 +177,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
             {isMoviesOpen && (
               <div className="mt-1 ml-4 pl-4 border-l border-gray-200 space-y-1">
                 <Link
-                  to="/movies/registro-multiple"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/movies/registro-multiple'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Clapperboard className="h-4 w-4" />
-                  Registro Múltiple
-                </Link>
-                <Link
                   to="/movies/dooplex-r-movie"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -273,18 +189,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Dooplex R-Movie
                 </Link>
                 <Link
-                  to="/movies/urls-plusmovie"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/movies/urls-plusmovie'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Urls Plusmovie
-                </Link>
-                <Link
                   to="/movies/urls-dooplex"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -295,18 +199,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                 >
                   <ListVideo className="h-4 w-4" />
                   Urls Dooplex
-                </Link>
-                <Link
-                  to="/movies/urls-docines"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/movies/urls-docines'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Urls Docines
                 </Link>
               </div>
             )}
@@ -588,6 +480,30 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   <ListVideo className="h-4 w-4" />
                   Byse
                 </Link>
+                <Link
+                  to="/servidores/vidara"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/servidores/vidara'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <CloudUpload className="h-4 w-4" />
+                  Vidara
+                </Link>
+                <Link
+                  to="/servidores/streamwish"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/servidores/streamwish'
+                      ? 'bg-orange-50 text-orange-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Flame className="h-4 w-4" />
+                  Streamwish
+                </Link>
               </div>
             )}
           </div>
@@ -614,6 +530,18 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
 
             {isHerramientasOpen && (
               <div className="mt-1 ml-4 pl-4 border-l border-gray-200 space-y-1">
+                <Link
+                  to="/herramientas/streamwish-mod"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/herramientas/streamwish-mod'
+                      ? 'bg-orange-50 text-orange-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Flame className="h-4 w-4" />
+                  Streamwish Mod
+                </Link>
                 <Link
                   to="/herramientas/uqload-mod"
                   onClick={onClose}

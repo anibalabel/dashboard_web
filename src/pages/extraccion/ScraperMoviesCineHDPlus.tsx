@@ -12,7 +12,7 @@ interface ScrapedResult {
 
 export default function ScraperMoviesCineHDPlus() {
   const [url, setUrl] = useState('');
-  const [preferredServer, setPreferredServer] = useState<'supervideo' | 'doodstream'>('supervideo');
+  const [preferredServer, setPreferredServer] = useState<string>('supervideo');
 
   const [isScraping, setIsScraping] = useState(false);
   const [logs, setLogs] = useState<{ msg: string; isError: boolean }[]>([]);
@@ -135,7 +135,17 @@ export default function ScraperMoviesCineHDPlus() {
             if (!link) continue;
 
             // 5. Filtrado de Servidores
-            if (serverName.includes(preferredServer)) {
+            const isMatch = (() => {
+              if (preferredServer === 'dropload' || preferredServer === 'dr0pstream') {
+                return serverName.includes('dropload') || serverName.includes('dr0pstream') || serverName.includes('dropstream') || link.includes('dr0pstream') || link.includes('dropload');
+              }
+              if (preferredServer === 'earnvids' || preferredServer === 'smoothpre') {
+                return serverName.includes('earnvids') || serverName.includes('earnvid') || serverName.includes('smoothpre') || link.toLowerCase().includes('earnvids') || link.toLowerCase().includes('smoothpre');
+              }
+              return serverName.includes(preferredServer) || link.toLowerCase().includes(preferredServer);
+            })();
+
+            if (isMatch) {
               if (link.startsWith('//')) {
                 link = 'https:' + link;
               }
@@ -251,11 +261,18 @@ export default function ScraperMoviesCineHDPlus() {
                 </label>
                 <select
                   value={preferredServer}
-                  onChange={(e) => setPreferredServer(e.target.value as 'supervideo' | 'doodstream')}
+                  onChange={(e) => setPreferredServer(e.target.value)}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2"
                 >
                   <option value="supervideo">Supervideo</option>
-                  <option value="doodstream">Doodstream</option>
+                  <option value="doodstream">Doodstream (dood.to)</option>
+                  <option value="mixdrop">MixDrop (mixdrop.ps)</option>
+                  <option value="dropload">DropLoad (dr0pstream.com)</option>
+                  <option value="streamwish">StreamWish</option>
+                  <option value="voe">VOE</option>
+                  <option value="earnvids">EarnVids</option>
+                  <option value="streamtape">Streamtape</option>
+                  <option value="uqload">Uqload</option>
                 </select>
               </div>
 

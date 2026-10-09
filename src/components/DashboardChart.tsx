@@ -8,16 +8,6 @@ interface DashboardChartProps {
 export const DashboardChart = ({ data }: DashboardChartProps) => {
   const chartData = [
     {
-      name: 'Docines',
-      movies: data.docines.movies,
-      series: data.docines.series,
-    },
-    {
-      name: 'Plusmovie',
-      movies: data.plusmovie.movies,
-      series: data.plusmovie.series,
-    },
-    {
       name: 'Dooplex',
       movies: data.dooplex.movies,
       series: data.dooplex.series,
