@@ -1,5 +1,7 @@
 import { useState, FormEvent } from 'react';
-import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, CheckCircle } from 'lucide-react';
+import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, CheckCircle, Check } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
+import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 
 interface ScrapedResult {
   season: number;
@@ -92,9 +94,10 @@ export default function ScraperCineHDPlusSeries() {
         if (match) {
           const s = parseInt(match[1]);
           const e = parseInt(match[2]);
+          const formattedUrl = formatDoodstreamUrl(link);
           
           if (!allEpisodes.some(ep => ep.season === s && ep.episode === e)) {
-            allEpisodes.push({ season: s, episode: e, url: link, title });
+            allEpisodes.push({ season: s, episode: e, url: formattedUrl, title });
           }
         }
       });
@@ -166,28 +169,37 @@ export default function ScraperCineHDPlusSeries() {
   };
 
   const [notification, setNotification] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const copyToClipboard = (text: string) => {
+  const handleCopy = async (text: string, key: string, successMsg?: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    showNotification('URL copiada al portapapeles');
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showNotification(successMsg || 'URL copiada al portapapeles');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showNotification('Error al copiar al portapapeles');
+    }
   };
 
-  const copyAllLinks = () => {
+  const copyAllLinks = async () => {
     const links = results
       .map(r => r.url)
+      .filter(l => Boolean(l && !l.startsWith('--ERROR--')))
       .join('\n');
     
     if (links) {
-      navigator.clipboard.writeText(links);
-      showNotification(`Todos los enlaces copiados`);
+      await handleCopy(links, 'all', 'Todos los enlaces copiados');
     } else {
-      showNotification(`No hay enlaces disponibles`);
+      showNotification('No hay enlaces disponibles para copiar');
     }
   };
 
@@ -307,11 +319,26 @@ export default function ScraperCineHDPlusSeries() {
               {results.length > 0 && (
                 <div className="flex gap-2">
                   <button 
+                    type="button"
                     onClick={() => copyAllLinks()}
-                    className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded transition-all shadow-sm ${
+                      copiedKey === 'all'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    }`}
                     title="Copiar todos los enlaces"
                   >
-                    Copiar Todos
+                    {copiedKey === 'all' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>¡Copiados!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar Todos</span>
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -327,7 +354,7 @@ export default function ScraperCineHDPlusSeries() {
             {results.length > 0 && (
               <div className="space-y-4 overflow-y-auto max-h-[600px] pr-2">
                 {results.map((res, idx) => (
-                  <div key={idx} className={`bg-gray-50 border border-gray-200 rounded-lg p-4 ${res.isError ? 'border-red-200 bg-red-50' : ''}`}>
+                  <div key={idx} className={`bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm ${res.isError ? 'border-red-200 bg-red-50' : ''}`}>
                     <h3 className="font-bold text-gray-800 mb-3 text-lg border-b border-gray-200 pb-2">
                       Temporada {res.season} - Episodio {res.episode}
                       {res.title && <span className="ml-2 text-sm font-normal text-gray-600">({res.title})</span>}
@@ -335,14 +362,33 @@ export default function ScraperCineHDPlusSeries() {
                     
                     <div className="space-y-2">
                       {/* Enlace Único */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold px-2 py-1 bg-blue-100 text-blue-700 rounded w-16 text-center">
+                      <div className="flex items-center gap-2 bg-white p-2 rounded border border-gray-200">
+                        <span className="text-xs font-bold px-2 py-1 bg-blue-100 text-blue-700 rounded w-16 text-center shrink-0">
                           LINK
                         </span>
-                        <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1" title={res.url}>{res.url}</a>
-                        <button onClick={() => copyToClipboard(res.url)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                          <Copy className="h-4 w-4" />
-                        </button>
+                        {res.isError ? (
+                          <span className="text-sm text-red-600 font-mono truncate flex-1">{res.url}</span>
+                        ) : (
+                          <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1 font-mono" title={res.url}>{res.url}</a>
+                        )}
+                        {!res.isError && (
+                          <button 
+                            type="button"
+                            onClick={() => handleCopy(res.url, `ep-${idx}`)} 
+                            className={`p-1.5 rounded transition-all shrink-0 ${
+                              copiedKey === `ep-${idx}`
+                                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-400'
+                                : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                            }`}
+                            title="Copiar URL"
+                          >
+                            {copiedKey === `ep-${idx}` ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

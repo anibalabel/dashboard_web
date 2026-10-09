@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, CheckCircle, Wrench } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 
 export default function UqloadMod() {
   const [inputUrls, setInputUrls] = useState('');
@@ -42,12 +43,10 @@ export default function UqloadMod() {
 
   const handleCopy = async () => {
     if (!outputUrls) return;
-    try {
-      await navigator.clipboard.writeText(outputUrls);
+    const ok = await copyToClipboard(outputUrls);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy!', err);
     }
   };
 

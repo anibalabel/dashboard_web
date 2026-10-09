@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle, Copy, Film, Loader2, Search, Terminal } from 'lucide-react';
+import { AlertCircle, CheckCircle, Copy, Film, Loader2, Search, Terminal, Check } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
+import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 
 type LogLine = { msg: string; isError: boolean };
 
@@ -148,6 +150,8 @@ export default function ScraperSeriesLyMovie() {
     setCookieId(next);
   }, []);
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
   const addLog = (msg: string, isError = false) => {
     setLogs(prev => [...prev, { msg, isError }]);
   };
@@ -157,10 +161,31 @@ export default function ScraperSeriesLyMovie() {
     setTimeout(() => setNotification(null), 2500);
   };
 
-  const copyToClipboard = (text: string) => {
+  const handleCopy = async (text: string, key: string, successMsg?: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    showNotification('URL copiada al portapapeles');
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showNotification(successMsg || 'URL copiada al portapapeles');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showNotification('Error al copiar al portapapeles');
+    }
+  };
+
+  const copyAllLinks = async () => {
+    const links = filteredResults
+      .map(r => r.finalSrc || r.playUrl)
+      .filter((l): l is string => Boolean(l && l.trim()))
+      .join('\n');
+
+    if (links) {
+      await handleCopy(links, 'all-all', 'Todos los enlaces copiados');
+    } else {
+      showNotification('No hay enlaces disponibles para copiar');
+    }
   };
 
   const fetchText = async (targetUrl: string, opts?: { method?: string; body?: BodyInit; referer?: string; cookieId?: string; resetCookie?: boolean }) => {
@@ -343,7 +368,7 @@ export default function ScraperSeriesLyMovie() {
     let final = extractFinalSrcFromJsonOrHtml(raw);
     if (!final) return null;
     if (final.startsWith('//')) final = `https:${final}`;
-    return final;
+    return formatDoodstreamUrl(final);
   };
 
   const handleScrape = async (e: FormEvent<HTMLFormElement>) => {
@@ -594,9 +619,35 @@ export default function ScraperSeriesLyMovie() {
 
         <div className="lg:col-span-7">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4 border-b pb-2">
-              <h2 className="text-lg font-semibold text-gray-900">Resultados</h2>
-              <span className="text-sm text-gray-500">{filteredResults.length} links</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 border-b pb-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900">Resultados</h2>
+                <span className="text-sm text-gray-500">({filteredResults.length} links)</span>
+              </div>
+              {filteredResults.length > 0 && (
+                <button
+                  type="button"
+                  onClick={copyAllLinks}
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded transition-all shadow-sm ${
+                    copiedKey === 'all-all'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
+                  title="Copiar todos los enlaces disponibles"
+                >
+                  {copiedKey === 'all-all' ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      <span>¡Copiados!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copiar Todos</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {filteredResults.length === 0 ? (
@@ -627,12 +678,25 @@ export default function ScraperSeriesLyMovie() {
                             {r.finalSrc && (
                               <button
                                 type="button"
-                                onClick={() => copyToClipboard(r.finalSrc || '')}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs"
+                                onClick={() => handleCopy(r.finalSrc || '', `row-${idx}`)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-all shrink-0 ${
+                                  copiedKey === `row-${idx}`
+                                    ? 'bg-emerald-100 text-emerald-800 font-medium ring-1 ring-emerald-300'
+                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                }`}
                                 title="Copiar src"
                               >
-                                <Copy className="h-3 w-3" />
-                                Copiar
+                                {copiedKey === `row-${idx}` ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-emerald-600" />
+                                    <span>¡Copiado!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3 w-3" />
+                                    <span>Copiar</span>
+                                  </>
+                                )}
                               </button>
                             )}
                           </div>

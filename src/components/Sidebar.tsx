@@ -261,6 +261,18 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Registro Múltiple
                 </Link>
                 <Link
+                  to="/movies/dooplex-r-movie"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/movies/dooplex-r-movie'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Film className="h-4 w-4" />
+                  Dooplex R-Movie
+                </Link>
+                <Link
                   to="/movies/urls-plusmovie"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${

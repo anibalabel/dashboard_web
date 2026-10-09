@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   Folder, FileVideo, Upload, Trash2, FolderPlus, RefreshCw, 
-  Loader2, CheckCircle, AlertCircle, Copy, Clock
+  Loader2, CheckCircle, AlertCircle, Copy, Clock, Check
 } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
 import {
   listFoldersAndFiles,
   createFolder,
@@ -134,9 +135,20 @@ export default function Byse() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showNotification('Enlace copiado');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboardHandler = async (text: string, key: string) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showNotification('Enlace copiado');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showNotification('Error al copiar', 'error');
+    }
   };
 
   // --- Upload Logic ---
@@ -368,13 +380,23 @@ export default function Byse() {
                   <div key={file.file_code} className="group flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors relative">
                     <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 rounded shadow-sm backdrop-blur-sm p-1">
                       <button 
-                        onClick={() => copyToClipboard(`https://bysesukior.com/e/${file.file_code}`)}
-                        className="p-1.5 hover:bg-gray-100 rounded text-gray-600"
+                        type="button"
+                        onClick={() => copyToClipboardHandler(`https://bysesukior.com/e/${file.file_code}`, `file-${file.file_code}`)}
+                        className={`p-1.5 rounded transition-colors ${
+                          copiedKey === `file-${file.file_code}`
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'hover:bg-gray-100 text-gray-600'
+                        }`}
                         title="Copiar Link"
                       >
-                        <Copy className="h-4 w-4" />
+                        {copiedKey === `file-${file.file_code}` ? (
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
                       </button>
                       <button 
+                        type="button"
                         onClick={() => handleCloneFile(file.file_code)}
                         className="p-1.5 hover:bg-indigo-50 rounded text-indigo-600"
                         title="Clonar aquí"

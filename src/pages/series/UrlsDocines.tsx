@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Edit2, Link as LinkIcon, Loader2, Save, Search, Trash2, X } from 'lucide-react';
+import { AlertCircle, Edit2, Link as LinkIcon, Loader2, Save, Search, Trash2, X, Copy, Check } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import {
   deleteDocinesVideo,
@@ -118,13 +119,28 @@ export default function UrlsDocines() {
   const selectAll = () => setSelectedVideos(allVideoIds);
   const deselectAll = () => setSelectedVideos([]);
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyText = async (text: string, key: string, successMsg?: string) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showSnackbar(successMsg || 'URL copiada al portapapeles', 'success');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showSnackbar('Error al copiar al portapapeles', 'error');
+    }
+  };
+
   const handleCopyUrls = async () => {
     const urls =
       selectedVideos.length > 0
         ? Object.values(videosMap).flat().filter(v => selectedVideos.includes(v.id)).map(v => v.url).join('\n')
         : Object.values(videosMap).flat().map(v => v.url).join('\n');
-    await navigator.clipboard.writeText(urls);
-    showSnackbar('URLs copiadas al portapapeles', 'success');
+    await handleCopyText(urls, 'all', 'URLs copiadas al portapapeles');
   };
 
   const handleEdit = (video: DocinesVideoLink) => {
@@ -289,10 +305,24 @@ export default function UrlsDocines() {
                   </button>
                   <button
                     onClick={handleCopyUrls}
-                    className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold transition-colors flex items-center gap-1"
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                      copiedKey === 'all'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
                     type="button"
                   >
-                    <LinkIcon className="h-3 w-3" /> Copiar URLs
+                    {copiedKey === 'all' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>¡Copiadas!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar URLs</span>
+                      </>
+                    )}
                   </button>
                   {selectedVideos.length > 0 && (
                     <button
@@ -412,14 +442,23 @@ export default function UrlsDocines() {
                                             <Edit2 className="h-3 w-3" /> Editar
                                           </button>
                                           <button
-                                            onClick={() => {
-                                              navigator.clipboard.writeText(video.url);
-                                              showSnackbar('URL copiada', 'success');
-                                            }}
-                                            className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-semibold transition-colors"
+                                            onClick={() => handleCopyText(video.url, `vid-${video.id}`)}
+                                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                              copiedKey === `vid-${video.id}`
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                            }`}
                                             type="button"
                                           >
-                                            <LinkIcon className="h-3 w-3" /> Copiar
+                                            {copiedKey === `vid-${video.id}` ? (
+                                              <>
+                                                <Check className="h-3 w-3 text-emerald-600" /> ¡Copiado!
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Copy className="h-3 w-3" /> Copiar
+                                              </>
+                                            )}
                                           </button>
                                           <button
                                             onClick={() => handleDeleteOne(video.id, ep.id)}

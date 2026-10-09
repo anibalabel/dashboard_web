@@ -286,6 +286,10 @@ export interface DooplexMovieRegisterPayload {
   header: string;
   link: string;
   lang: string;
+  embed?: string;
+  youtubelink?: string;
+  hls?: string;
+  supported_hosts?: string;
 }
 
 export interface PlusmovieMovieRegisterPayload {

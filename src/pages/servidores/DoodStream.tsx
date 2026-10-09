@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   Folder, FileVideo, Upload, Trash2, FolderPlus, RefreshCw, 
-  ArrowLeft, Edit2, Loader2, CheckCircle, AlertCircle 
+  ArrowLeft, Edit2, Loader2, CheckCircle, AlertCircle, Copy, Check 
 } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 import {
   listFoldersAndFiles,
   createFolder,
@@ -61,9 +62,25 @@ export default function DoodStream() {
     setModalConfig(prev => ({ ...prev, isOpen: false }));
   };
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
   const showNotification = (msg: string, type: 'success' | 'error' = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleCopyUrl = async (fileCode: string) => {
+    const doodUrl = `https://dood.to/e/${fileCode}`;
+    const ok = await copyToClipboard(doodUrl);
+    if (ok) {
+      setCopiedKey(`file-${fileCode}`);
+      showNotification('Enlace copiado (https://dood.to/e/...)');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === `file-${fileCode}` ? null : prev));
+      }, 2000);
+    } else {
+      showNotification('Error al copiar el enlace', 'error');
+    }
   };
 
   // --- Explorer Logic ---
@@ -368,13 +385,28 @@ export default function DoodStream() {
                 {/* Files */}
                 {files.map(file => (
                   <div key={file.file_code} className="group flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors relative">
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/80 rounded backdrop-blur-sm p-1">
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 rounded-md shadow-sm backdrop-blur-sm p-1">
+                      <button 
+                        onClick={() => handleCopyUrl(file.file_code)}
+                        className={`p-1.5 rounded transition-colors ${
+                          copiedKey === `file-${file.file_code}`
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'hover:bg-blue-50 text-gray-600 hover:text-blue-600'
+                        }`}
+                        title="Copiar enlace https://dood.to/e/..."
+                      >
+                        {copiedKey === `file-${file.file_code}` ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                       <button 
                         onClick={() => handleRenameFile(file.file_code, file.title)}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-600"
+                        className="p-1.5 hover:bg-gray-100 rounded text-gray-600"
                         title="Renombrar"
                       >
-                        <Edit2 className="h-3 w-3" />
+                        <Edit2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     <div className="aspect-video bg-gray-100 rounded mb-2 overflow-hidden relative">

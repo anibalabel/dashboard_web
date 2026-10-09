@@ -1,5 +1,7 @@
 import { useState, FormEvent } from 'react';
-import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy } from 'lucide-react';
+import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckCircle } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
+import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 
 interface ScrapedResult {
   lat?: { nume: string; title: string; src: string }[];
@@ -203,8 +205,9 @@ export default function ScraperMoviesCinemitasV2() {
               }
             }
 
-            addLog(`URL final (nume=${nume}): ${embedUrl}`);
-            const item = { nume, title, src: embedUrl };
+            const formattedSrc = formatDoodstreamUrl(embedUrl, targetServer || title);
+            addLog(`URL final (nume=${nume}): ${formattedSrc}`);
+            const item = { nume, title, src: formattedSrc };
             if (lang === 'LAT') {
               if (!latLinks.some(x => x.src === item.src)) latLinks.push(item);
             } else if (lang === 'CAST') {
@@ -237,29 +240,53 @@ export default function ScraperMoviesCinemitasV2() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = async (text: string, key: string, successMsg?: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    showNotification('URL copiada al portapapeles');
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showNotification(successMsg || 'URL copiada al portapapeles');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showNotification('Error al copiar al portapapeles');
+    }
   };
 
-  const copyAllLinks = (type: 'lat' | 'cast' | 'sub') => {
-    const links = results.flatMap(r => (r[type] || []).map(x => x.src)).join('\n');
-    
-    if (links) {
-      navigator.clipboard.writeText(links);
-      showNotification(`Todos los enlaces ${type.toUpperCase()} copiados`);
+  const copyAllLinks = async (type: 'all' | 'lat' | 'cast' | 'sub') => {
+    let links = '';
+    let label = '';
+
+    if (type === 'all') {
+      links = results
+        .flatMap(r => [...(r.lat || []), ...(r.cast || []), ...(r.sub || [])].map(x => x.src))
+        .filter(Boolean)
+        .join('\n');
+      label = 'todos los enlaces';
     } else {
-      showNotification(`No hay enlaces ${type.toUpperCase()} disponibles`);
+      links = results
+        .flatMap(r => (r[type] || []).map(x => x.src))
+        .filter(Boolean)
+        .join('\n');
+      label = `enlaces ${type.toUpperCase()}`;
+    }
+
+    if (links) {
+      await handleCopy(links, `all-${type}`, `Todos los ${label} copiados`);
+    } else {
+      showNotification(`No hay ${label} disponibles`);
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 relative">
       {notification && (
-        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 animate-fade-in-down">
-          <Copy className="h-4 w-4" />
-          <span>{notification}</span>
+        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2.5 border border-gray-700 animate-fade-in-down">
+          <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+          <span className="text-sm font-medium">{notification}</span>
         </div>
       )}
       <div className="mb-8 flex items-center gap-3">
@@ -351,80 +378,218 @@ export default function ScraperMoviesCinemitasV2() {
         {/* Resultados */}
         <div className="lg:col-span-7">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2 flex justify-between items-center">
-              <span>Resultados ({results.length})</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Resultados ({results.length})
+              </h2>
               {results.length > 0 && (
-                <div className="flex gap-2">
-                  <button 
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copyAllLinks('all')}
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded transition-all shadow-sm ${
+                      copiedKey === 'all-all'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    }`}
+                    title="Copiar todos los enlaces disponibles"
+                  >
+                    {copiedKey === 'all-all' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>¡Copiados!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar Todos</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => copyAllLinks('lat')}
-                    className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
-                    title="Copiar todos los Latinos"
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded transition-all border ${
+                      copiedKey === 'all-lat'
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                        : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-800'
+                    }`}
+                    title="Copiar todos los enlaces Latinos"
                   >
-                    Copiar LAT
+                    {copiedKey === 'all-lat' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>¡LAT Copiados!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar LAT</span>
+                      </>
+                    )}
                   </button>
-                  <button 
+
+                  <button
+                    type="button"
                     onClick={() => copyAllLinks('cast')}
-                    className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors"
-                    title="Copiar todos los Castellanos"
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded transition-all border ${
+                      copiedKey === 'all-cast'
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                        : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-800'
+                    }`}
+                    title="Copiar todos los enlaces Castellanos"
                   >
-                    Copiar CAST
+                    {copiedKey === 'all-cast' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>¡CAST Copiados!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar CAST</span>
+                      </>
+                    )}
                   </button>
-                  <button 
+
+                  <button
+                    type="button"
                     onClick={() => copyAllLinks('sub')}
-                    className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 transition-colors"
-                    title="Copiar todos los Subtitulados"
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded transition-all border ${
+                      copiedKey === 'all-sub'
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                        : 'bg-green-50 hover:bg-green-100 border-green-200 text-green-800'
+                    }`}
+                    title="Copiar todos los enlaces Subtitulados"
                   >
-                    Copiar SUB
+                    {copiedKey === 'all-sub' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>¡SUB Copiados!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar SUB</span>
+                      </>
+                    )}
                   </button>
                 </div>
               )}
-            </h2>
+            </div>
 
             {results.length === 0 && !isScraping && (
-              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <div className="flex flex-col items-center justify-center flex-1 min-h-[250px] text-gray-400">
                 <AlertCircle className="h-12 w-12 mb-2 opacity-20" />
                 <p>No hay resultados aún</p>
               </div>
             )}
 
             {results.length > 0 && (
-              <div className="space-y-4 overflow-y-auto max-h-[600px] pr-2">
+              <div className="space-y-4 overflow-y-auto max-h-[600px] pr-2 flex-1">
                 {results.map((res, idx) => (
-                  <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-bold text-gray-800 mb-3 text-lg border-b border-gray-200 pb-2">
-                      Enlaces de la Película
-                    </h3>
+                  <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-3">
+                      <h3 className="font-bold text-gray-800 text-base">
+                        Enlaces de la Película
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const movieLinks = [...(res.lat || []), ...(res.cast || []), ...(res.sub || [])].map(x => x.src).filter(Boolean).join('\n');
+                          handleCopy(movieLinks, `card-${idx}`, 'Enlaces de la película copiados');
+                        }}
+                        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                          copiedKey === `card-${idx}`
+                            ? 'bg-emerald-100 text-emerald-800 font-medium'
+                            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                        }`}
+                        title="Copiar todos los enlaces de esta película"
+                      >
+                        {copiedKey === `card-${idx}` ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copiar Todo</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                     
                     <div className="space-y-2">
                       {(res.lat || []).map((s, i) => (
-                        <div key={`lat-${i}`} className="flex items-center justify-between gap-4 bg-white p-2 rounded border border-gray-100">
-                          <span className="font-semibold text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded w-16 text-center">LAT</span>
-                          <span className="text-xs text-gray-500 w-20 text-right">nume {s.nume}</span>
-                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all flex-1" title={s.src}>{s.src}</a>
-                          <button onClick={() => copyToClipboard(s.src)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                            <Copy className="h-4 w-4" />
+                        <div key={`lat-${i}`} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-blue-300 transition-colors">
+                          <span className="font-semibold text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded w-14 text-center shrink-0">LAT</span>
+                          <span className="text-xs text-gray-500 w-16 text-right shrink-0">nume {s.nume}</span>
+                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1 font-mono" title={s.src}>{s.src}</a>
+                          <button 
+                            type="button"
+                            onClick={() => handleCopy(s.src, `lat-${idx}-${i}`)} 
+                            className={`p-1.5 rounded transition-all shrink-0 ${
+                              copiedKey === `lat-${idx}-${i}`
+                                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-400'
+                                : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                            }`}
+                            title="Copiar enlace Latino"
+                          >
+                            {copiedKey === `lat-${idx}-${i}` ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       ))}
                       
                       {(res.cast || []).map((s, i) => (
-                        <div key={`cast-${i}`} className="flex items-center justify-between gap-4 bg-white p-2 rounded border border-gray-100">
-                          <span className="font-semibold text-xs text-red-800 bg-red-100 px-2 py-1 rounded w-16 text-center">CAST</span>
-                          <span className="text-xs text-gray-500 w-20 text-right">nume {s.nume}</span>
-                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all flex-1" title={s.src}>{s.src}</a>
-                          <button onClick={() => copyToClipboard(s.src)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                            <Copy className="h-4 w-4" />
+                        <div key={`cast-${i}`} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-red-300 transition-colors">
+                          <span className="font-semibold text-xs text-red-800 bg-red-100 px-2 py-1 rounded w-14 text-center shrink-0">CAST</span>
+                          <span className="text-xs text-gray-500 w-16 text-right shrink-0">nume {s.nume}</span>
+                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1 font-mono" title={s.src}>{s.src}</a>
+                          <button 
+                            type="button"
+                            onClick={() => handleCopy(s.src, `cast-${idx}-${i}`)} 
+                            className={`p-1.5 rounded transition-all shrink-0 ${
+                              copiedKey === `cast-${idx}-${i}`
+                                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-400'
+                                : 'text-gray-500 hover:text-red-600 hover:bg-red-50'
+                            }`}
+                            title="Copiar enlace Castellano"
+                          >
+                            {copiedKey === `cast-${idx}-${i}` ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       ))}
 
                       {(res.sub || []).map((s, i) => (
-                        <div key={`sub-${i}`} className="flex items-center justify-between gap-4 bg-white p-2 rounded border border-gray-100">
-                          <span className="font-semibold text-xs text-green-800 bg-green-100 px-2 py-1 rounded w-16 text-center">SUB</span>
-                          <span className="text-xs text-gray-500 w-20 text-right">nume {s.nume}</span>
-                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all flex-1" title={s.src}>{s.src}</a>
-                          <button onClick={() => copyToClipboard(s.src)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                            <Copy className="h-4 w-4" />
+                        <div key={`sub-${i}`} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-green-300 transition-colors">
+                          <span className="font-semibold text-xs text-green-800 bg-green-100 px-2 py-1 rounded w-14 text-center shrink-0">SUB</span>
+                          <span className="text-xs text-gray-500 w-16 text-right shrink-0">nume {s.nume}</span>
+                          <a href={s.src} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1 font-mono" title={s.src}>{s.src}</a>
+                          <button 
+                            type="button"
+                            onClick={() => handleCopy(s.src, `sub-${idx}-${i}`)} 
+                            className={`p-1.5 rounded transition-all shrink-0 ${
+                              copiedKey === `sub-${idx}-${i}`
+                                ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-400'
+                                : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+                            }`}
+                            title="Copiar enlace Subtitulado"
+                          >
+                            {copiedKey === `sub-${idx}-${i}` ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       ))}

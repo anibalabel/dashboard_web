@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Search, Film, Loader2, CheckCircle, AlertCircle, RefreshCw, Copy } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 import {
   getPlusmovieMovie,
   getPlusmovieMovieByTitle,
@@ -44,10 +45,14 @@ export default function RegistroMultiplePeliculas() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboardHandler = async (text: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    showNotification('URL copiada al portapapeles');
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      showNotification('URL copiada al portapapeles');
+    } else {
+      showNotification('Error al copiar al portapapeles');
+    }
   };
 
   // Form Data - Global Language

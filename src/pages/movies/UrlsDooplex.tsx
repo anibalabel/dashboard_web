@@ -1,5 +1,6 @@
 import { useMemo, useState, FormEvent } from 'react';
-import { AlertCircle, Link as LinkIcon, Loader2, Save, Search, Trash2, X, Edit2 } from 'lucide-react';
+import { AlertCircle, Link as LinkIcon, Loader2, Save, Search, Trash2, X, Edit2, Copy, Check } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import {
   deleteDooplexMovieVideo,
@@ -86,13 +87,28 @@ export default function UrlsDooplexPeliculas() {
   const selectAll = () => setSelectedVideos(allVideoIds);
   const deselectAll = () => setSelectedVideos([]);
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyText = async (text: string, key: string, successMsg?: string) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedKey(key);
+      showSnackbar(successMsg || 'URL copiada al portapapeles', 'success');
+      setTimeout(() => {
+        setCopiedKey(prev => (prev === key ? null : prev));
+      }, 2000);
+    } else {
+      showSnackbar('Error al copiar al portapapeles', 'error');
+    }
+  };
+
   const handleCopyUrls = async () => {
     const urls =
       selectedVideos.length > 0
         ? videos.filter(v => selectedVideos.includes(v.id)).map(v => v.link).join('\n')
         : videos.map(v => v.link).join('\n');
-    await navigator.clipboard.writeText(urls);
-    showSnackbar('URLs copiadas al portapapeles', 'success');
+    await handleCopyText(urls, 'all', 'URLs copiadas al portapapeles');
   };
 
   const handleEdit = (video: DooplexMovieVideo) => {
@@ -229,11 +245,26 @@ export default function UrlsDooplexPeliculas() {
               </div>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={handleCopyUrls}
                   disabled={videos.length === 0}
-                  className="px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                  className={`px-4 py-2 rounded-md disabled:opacity-50 transition-colors flex items-center gap-1.5 font-medium text-sm ${
+                    copiedKey === 'all'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
                 >
-                  Copiar URLs
+                  {copiedKey === 'all' ? (
+                    <>
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <span>¡Copiadas!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      <span>Copiar URLs</span>
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={handleMassDelete}
@@ -383,6 +414,23 @@ export default function UrlsDooplexPeliculas() {
                         </div>
                         <div className="flex gap-2 ml-4">
                           <button
+                            type="button"
+                            onClick={() => handleCopyText(video.link, `vid-${video.id}`)}
+                            className={`p-2 rounded-md transition-colors ${
+                              copiedKey === `vid-${video.id}`
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                            }`}
+                            title="Copiar URL"
+                          >
+                            {copiedKey === `vid-${video.id}` ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleEdit(video)}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                             title="Editar"
@@ -390,6 +438,7 @@ export default function UrlsDooplexPeliculas() {
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDeleteOne(video.id)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                             title="Eliminar"

@@ -14,6 +14,7 @@ import UrlsPlusmovie from "@/pages/series/UrlsPlusmovie";
 import UrlsDocines from "@/pages/series/UrlsDocines";
 import UrlsDocinesUpdate from "@/pages/series/UrlsDocinesUpdate";
 import RegistroMultiplePeliculas from "@/pages/movies/RegistroMultiple";
+import DooplexRMovie from "@/pages/movies/DooplexRMovie";
 import UrlsPlusmoviePeliculas from "@/pages/movies/UrlsPlusmovie";
 import UrlsDooplexPeliculas from "@/pages/movies/UrlsDooplex";
 import UrlsDocinesPeliculas from "@/pages/movies/UrlsDocines";
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/series/urls-docines" element={<UrlsDocines />} />
           <Route path="/series/urls-docines-update" element={<UrlsDocinesUpdate />} />
           <Route path="/movies/registro-multiple" element={<RegistroMultiplePeliculas />} />
+          <Route path="/movies/dooplex-r-movie" element={<DooplexRMovie />} />
           <Route path="/movies/urls-plusmovie" element={<UrlsPlusmoviePeliculas />} />
           <Route path="/movies/urls-dooplex" element={<UrlsDooplexPeliculas />} />
           <Route path="/movies/urls-docines" element={<UrlsDocinesPeliculas />} />

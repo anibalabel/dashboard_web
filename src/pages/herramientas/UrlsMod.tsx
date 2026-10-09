@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, CheckCircle, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { copyToClipboard } from '../../lib/clipboard';
 
 export default function UrlsMod() {
   const [inputUrls, setInputUrls] = useState('');
@@ -39,12 +40,10 @@ export default function UrlsMod() {
 
   const handleCopy = async () => {
     if (!outputUrls) return;
-    try {
-      await navigator.clipboard.writeText(outputUrls);
+    const ok = await copyToClipboard(outputUrls);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy!', err);
     }
   };
 
