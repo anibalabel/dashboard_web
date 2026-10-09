@@ -371,42 +371,6 @@ export default function ScraperMoviesPelisplus() {
           throw new Error('Datos JSON no encontrados en Embed69');
         }
 
-<<<<<<< HEAD
-=======
-        const parsedData = new Function(`return ${dataMatch[1]}`)();
-
-        addLog(`Verificando encriptación PoW + AES...`);
-        const powChallengeMatch = iframeHtml.match(/POW_CHALLENGE\s*=\s*['"]([^'"]+)['"]/);
-        const powDifficultyMatch = iframeHtml.match(/POW_DIFFICULTY\s*=\s*(\d+)/);
-        const powSaltMatch = iframeHtml.match(/POW_SALT\s*=\s*['"]([^'"]+)['"]/);
-
-        let aesKey: Uint8Array | null = null;
-        if (powChallengeMatch && powDifficultyMatch && powSaltMatch) {
-            aesKey = await solvePoW(powChallengeMatch[1], parseInt(powDifficultyMatch[1]), powSaltMatch[1]);
-        } else {
-            // Fallback to hardcoded from first implementation if not found (just in case)
-            aesKey = await solvePoW('8147cce513624b7c73b28c9b7166d9df', 3, '6d07665b9850a0db');
-        }
-
-        if (aesKey) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          for (const langGroup of parsedData) {
-            if (langGroup.sortedEmbeds) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              for (const embed of langGroup.sortedEmbeds) {
-                if (embed.link) embed.link = await decryptAES(embed.link, aesKey);
-              }
-            }
-            if (langGroup.downloadEmbeds) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              for (const embed of langGroup.downloadEmbeds) {
-                if (embed.link) embed.link = await decryptAES(embed.link, aesKey);
-              }
-            }
-          }
-        }
-
->>>>>>> bb4ba96c1fa018a5addf6494f1a9183f9af43cee
         let latUrl = null;
         let castUrl = null;
         let subUrl = null;
@@ -427,7 +391,6 @@ export default function ScraperMoviesPelisplus() {
              if (String(server.servername).toLowerCase() !== targetServer.toLowerCase()) continue;
              
              try {
-<<<<<<< HEAD
                 let cleanUrl = extractCleanUrlFromEmbedLink(server.link);
                 if (cleanUrl) {
                    // Resolve Streamwish redirects
@@ -448,72 +411,11 @@ export default function ScraperMoviesPelisplus() {
                    } else {
                      // Fallback si no identificamos
                      if (!latUrl) latUrl = cleanUrl;
-=======
-                let cleanUrl: string | null = null;
-                const serverName = String(server.servername).toLowerCase();
-                const linkValue = server.link;
-
-                // 1. Check for JWT
-                const parts = linkValue.split('.');
-                if (parts.length === 3) {
-                   try {
-                     const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-                     const pad = base64Url.length % 4;
-                     const padded = pad ? base64Url + '='.repeat(4 - pad) : base64Url;
-                     const payload = JSON.parse(atob(padded));
-                     if (payload.link) {
-                       cleanUrl = payload.link.replace(/`/g, '').trim();
-                     }
-                   } catch (e) { /* Not a valid JWT, proceed to other checks */ }
-                }
-
-                // 2. If not a JWT, check if it's already a full URL or a direct ID for known hosts
-                if (!cleanUrl) {
-                  if (linkValue.startsWith('http')) {
-                      cleanUrl = linkValue;
-                  } else if (serverName === 'voe') {
-                      cleanUrl = `https://voe.sx/e/${linkValue}`;
-                  } else if (serverName === 'filemoon') {
-                      cleanUrl = `https://filemoon.sx/e/${linkValue}`;
-                  }
-                }
-                
-                // 3. If still no URL, try decoding as Base64 (for servers like streamwish, vidhide)
-                if (!cleanUrl) {
-                    try {
-                        const decoded = atob(linkValue);
-                        if (decoded.startsWith('http')) {
-                            cleanUrl = decoded;
-                        }
-                    } catch (e) { /* Not Base64 */ }
-                }
-
-                if (cleanUrl) {
-                      if (serverName === 'streamwish') {
-                          addLog(`Resolviendo redirección de Streamwish...`);
-                          cleanUrl = await resolveRedirect(cleanUrl);
-                      }
-                      
-                      // Clasificar por idioma basado en video_language
-                      if (langName === 'LAT' || langName === 'LATINO') {
-                        if (!latUrl) latUrl = cleanUrl;
-                      } else if (langName === 'ESP' || langName === 'CASTELLANO') {
-                        if (!castUrl) castUrl = cleanUrl;
-                      } else if (langName === 'SUB' || langName === 'SUBTITULADO') {
-                        if (!subUrl) subUrl = cleanUrl;
-                      } else {
-                        // Fallback si no identificamos
-                        if (!latUrl) latUrl = cleanUrl;
-                      }
->>>>>>> bb4ba96c1fa018a5addf6494f1a9183f9af43cee
                    }
+                }
              } catch (e) {
-<<<<<<< HEAD
                 console.error("Error procesando enlace de servidor", e);
-=======
-                console.error("Error procesando el enlace", e);
                 addLog(`Error al procesar enlace para ${server.servername}: ${e instanceof Error ? e.message : 'Error desconocido'}`);
->>>>>>> bb4ba96c1fa018a5addf6494f1a9183f9af43cee
              }
            }
         }
