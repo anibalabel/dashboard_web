@@ -347,30 +347,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Movies CineHDPlus
                 </Link>
                 <Link
-                  to="/extraccion/seriesly-movie"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/extraccion/seriesly-movie'
-                      ? 'bg-slate-50 text-slate-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <Film className="h-4 w-4" />
-                  Series.ly Movie
-                </Link>
-                <Link
-                  to="/extraccion/seriesly-series"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    location.pathname === '/extraccion/seriesly-series'
-                      ? 'bg-slate-50 text-slate-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
-                >
-                  <ListVideo className="h-4 w-4" />
-                  Series.ly Series
-                </Link>
-                <Link
                   to="/extraccion/animeonline-ninja"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${

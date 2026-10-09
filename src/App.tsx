@@ -33,8 +33,6 @@ import ScraperAnimeOnlineNinja from "@/pages/extraccion/ScraperAnimeOnlineNinja"
 import ScraperLatinoytAnime from "@/pages/extraccion/ScraperLatinoytAnime";
 import ScraperAnimeGratis from "@/pages/extraccion/ScraperAnimeGratis";
 import ScraperAnimeJL from "@/pages/extraccion/ScraperAnimeJL";
-import ScraperSeriesLyMovie from "@/pages/extraccion/ScraperSeriesLyMovie";
-import ScraperSeriesLySeries from "@/pages/extraccion/ScraperSeriesLySeries";
 import DoodStream from "@/pages/servidores/DoodStream";
 import Supervideo from "@/pages/servidores/Supervideo";
 import Byse from "@/pages/servidores/Byse";
@@ -88,8 +86,6 @@ export default function App() {
           <Route path="/extraccion/latinoyt-anime" element={<ScraperLatinoytAnime />} />
           <Route path="/extraccion/animegratis-net" element={<ScraperAnimeGratis />} />
           <Route path="/extraccion/anime-jl-series" element={<ScraperAnimeJL />} />
-          <Route path="/extraccion/seriesly-movie" element={<ScraperSeriesLyMovie />} />
-          <Route path="/extraccion/seriesly-series" element={<ScraperSeriesLySeries />} />
           <Route path="/servidores/doodstream" element={<DoodStream />} />
           <Route path="/servidores/supervideo" element={<Supervideo />} />
           <Route path="/servidores/byse" element={<Byse />} />
