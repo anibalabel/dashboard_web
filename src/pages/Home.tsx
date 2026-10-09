@@ -36,10 +36,10 @@ export default function Home() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Dooplex</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard MovFlix</h1>
           <p className="text-sm text-gray-500">Resumen y estado de contenido activo</p>
         </div>
-        <button 
+        <button
           onClick={loadData}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors shadow-sm"
