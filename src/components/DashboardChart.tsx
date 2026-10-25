@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DashboardData } from '../types';
 
@@ -6,6 +7,12 @@ interface DashboardChartProps {
 }
 
 export const DashboardChart = ({ data }: DashboardChartProps) => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const chartData = [
     {
       name: 'Dooplex',
@@ -18,8 +25,9 @@ export const DashboardChart = ({ data }: DashboardChartProps) => {
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
       <h3 className="text-lg font-bold text-gray-900 mb-6">Distribución de Contenido</h3>
-      <div className="w-full h-[320px]">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+      <div style={{ width: '100%', height: '320px', minHeight: '320px' }}>
+        {isMounted && (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <BarChart
           data={chartData}
           margin={{
@@ -59,6 +67,7 @@ export const DashboardChart = ({ data }: DashboardChartProps) => {
           <Bar dataKey="animes" name="Animes" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={60} />
         </BarChart>
       </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

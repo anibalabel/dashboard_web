@@ -108,7 +108,7 @@ export interface VidaraUploadParams {
 
 const executeApi = async (endpoint: string): Promise<any> => {
   const targetUrl = `${BASE_URL}${endpoint}`;
-  const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+  const proxyUrl = `https://app.movflix.live/proxy.php?url=${encodeURIComponent(targetUrl)}`;
 
   try {
     const response = await axios.get(proxyUrl, { timeout: 35000 });

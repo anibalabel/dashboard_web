@@ -3,6 +3,7 @@ import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckC
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 import { parseAndDecryptEmbed69, extractCleanUrlFromEmbedLink } from '@/lib/embed69Utils';
+import { getProxyUrl } from '@/lib/proxy';
 
 interface EpisodeLink {
   season: number;
@@ -71,11 +72,8 @@ export default function ScraperPelisplusSeries() {
   };
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
-    // Usar proxy local
-    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-    if (refererUrl) {
-      proxy += `&referer=${encodeURIComponent(refererUrl)}`;
-    }
+    // Usar proxy
+    const proxy = getProxyUrl(targetUrl, refererUrl ? { referer: refererUrl } : undefined);
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);
@@ -88,7 +86,7 @@ export default function ScraperPelisplusSeries() {
 
   const resolveRedirect = async (targetUrl: string) => {
     try {
-      const res = await fetch(`/api/proxy?url=${encodeURIComponent(targetUrl)}&resolve_redirect=true`);
+      const res = await fetch(getProxyUrl(targetUrl, { resolveRedirect: true }));
       if (!res.ok) return targetUrl;
       const data = await res.json();
       return data.finalUrl || targetUrl;

@@ -13,7 +13,7 @@ const fetchApi = async (endpoint: string) => {
     const err = error as { code?: string; response?: unknown };
     if (err.code === 'ERR_NETWORK' || !err.response) {
       console.warn('Direct fetch failed (CORS), falling back to proxy...');
-      const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+      const proxyUrl = `https://app.movflix.live/proxy.php?url=${encodeURIComponent(targetUrl)}`;
       const proxyResponse = await axios.get(proxyUrl);
       return typeof proxyResponse.data === 'string' ? JSON.parse(proxyResponse.data) : proxyResponse.data;
     }

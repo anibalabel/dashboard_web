@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
+import { getProxyUrl } from '@/lib/proxy';
 
 interface ScrapedResult {
   lat?: string | null;
@@ -28,8 +29,8 @@ export default function ScraperMoviesCinemitas() {
   };
 
   const fetchGET = async (targetUrl: string, refererUrl: string) => {
-    // Usar nuestro proxy PHP local que maneja headers correctamente
-    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    // Usar nuestro proxy PHP que maneja headers correctamente
+    const proxy = getProxyUrl(targetUrl, { referer: refererUrl });
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con el proxy local`);
@@ -41,8 +42,8 @@ export default function ScraperMoviesCinemitas() {
   };
 
   const fetchPOST = async (targetUrl: string, body: URLSearchParams, refererUrl: string) => {
-    // Usar nuestro proxy PHP local para peticiones POST complejas
-    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    // Usar nuestro proxy PHP para peticiones POST complejas
+    const proxy = getProxyUrl(targetUrl, { referer: refererUrl });
     
     try {
       const res = await fetch(proxy, {

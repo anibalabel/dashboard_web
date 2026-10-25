@@ -1,4 +1,4 @@
-export const PROXY_ENDPOINT = '/api/proxy';
+export const PROXY_ENDPOINT = 'https://app.movflix.live/proxy.php';
 
 export function getProxyUrl(
   targetUrl: string,

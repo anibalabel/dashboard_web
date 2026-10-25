@@ -1,5 +1,14 @@
 <?php
 header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+$method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : 'GET';
+if ($method === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 header('Content-Type: application/json');
 
 if (!isset($_GET['url'])) {
@@ -11,7 +20,6 @@ if (!isset($_GET['url'])) {
 $url = $_GET['url'];
 $referer = isset($_GET['referer']) ? $_GET['referer'] : '';
 $resolveRedirect = isset($_GET['resolve_redirect']) ? $_GET['resolve_redirect'] === 'true' : false;
-$method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : 'GET';
 
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $url);

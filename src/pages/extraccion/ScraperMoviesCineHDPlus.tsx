@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
+import { getProxyUrl } from '@/lib/proxy';
 
 interface ScrapedResult {
   title?: string;
@@ -30,11 +31,8 @@ export default function ScraperMoviesCineHDPlus() {
   };
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
-    // Usar proxy local
-    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-    if (refererUrl) {
-      proxy += `&referer=${encodeURIComponent(refererUrl)}`;
-    }
+    // Usar proxy
+    const proxy = getProxyUrl(targetUrl, refererUrl ? { referer: refererUrl } : undefined);
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);
@@ -47,8 +45,8 @@ export default function ScraperMoviesCineHDPlus() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fetchPOST = async (targetUrl: string, body: URLSearchParams, refererUrl: string) => {
-    // Usar nuestro proxy PHP local para peticiones POST complejas
-    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    // Usar nuestro proxy PHP para peticiones POST complejas
+    const proxy = getProxyUrl(targetUrl, { referer: refererUrl });
 
     try {
       const res = await fetch(proxy, {

@@ -3,6 +3,7 @@ import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, CheckCircle, 
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 import { parseAndDecryptEmbed69, extractCleanUrlFromEmbedLink } from '@/lib/embed69Utils';
+import { getProxyUrl } from '@/lib/proxy';
 
 interface ScrapedResult {
   lat?: string | null;
@@ -74,11 +75,8 @@ export default function ScraperMoviesPelisplus() {
       console.log("Fetch directo falló por CORS u otro error, usando proxy...");
     }
 
-    // Usar proxy local como fallback o cuando se necesita referer
-    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-    if (refererUrl) {
-      proxy += `&referer=${encodeURIComponent(refererUrl)}`;
-    }
+    // Usar proxy como fallback o cuando se necesita referer
+    const proxy = getProxyUrl(targetUrl, refererUrl ? { referer: refererUrl } : undefined);
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);
@@ -91,7 +89,7 @@ export default function ScraperMoviesPelisplus() {
 
   const resolveRedirect = async (targetUrl: string) => {
     try {
-      const res = await fetch(`/api/proxy?url=${encodeURIComponent(targetUrl)}&resolve_redirect=true`);
+      const res = await fetch(getProxyUrl(targetUrl, { resolveRedirect: true }));
       if (!res.ok) return targetUrl;
       const data = await res.json();
       return data.finalUrl || targetUrl;

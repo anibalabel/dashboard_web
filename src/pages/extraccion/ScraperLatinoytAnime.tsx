@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, CheckCircle, Check } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
+import { getProxyUrl } from '@/lib/proxy';
 
 interface ScrapedResult {
   episodeName?: string;
@@ -28,10 +29,7 @@ export default function ScraperLatinoytAnime() {
   };
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
-    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-    if (refererUrl) {
-      proxy += `&referer=${encodeURIComponent(refererUrl)}`;
-    }
+    const proxy = getProxyUrl(targetUrl, refererUrl ? { referer: refererUrl } : undefined);
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);

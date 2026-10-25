@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
+import { getProxyUrl } from '@/lib/proxy';
 
 type AllowedHost = 'voe.sx' | 'bysevepoin.com' | 'vidsonic.net' | 'dtpg.rpmplay.xyz' | 'gdtvid.p2pplay.pro' | 'ok.ru';
 
@@ -30,7 +31,7 @@ export default function ScraperMoviesGnulaV2() {
   };
 
   const fetchHTML = async (targetUrl: string) => {
-    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+    const proxy = getProxyUrl(targetUrl);
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);
