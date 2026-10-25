@@ -1,9 +1,7 @@
 {
   "version": 1,
   "include": [
-    "/proxy.php",
-    "/proxy",
-    "/api/*"
+    "/*"
   ],
   "exclude": [
     "/assets/*"
