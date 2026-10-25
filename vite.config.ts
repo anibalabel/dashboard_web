@@ -8,7 +8,7 @@ function devProxyPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const parsedUrl = new URL(req.url || '', 'http://localhost');
-        if (parsedUrl.pathname === '/proxy.php' || parsedUrl.pathname === '/proxy') {
+        if (parsedUrl.pathname === '/proxy.php' || parsedUrl.pathname === '/proxy' || parsedUrl.pathname === '/api/proxy') {
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
           res.setHeader('Access-Control-Allow-Headers', '*');

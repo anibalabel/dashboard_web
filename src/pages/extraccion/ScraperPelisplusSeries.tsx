@@ -72,7 +72,7 @@ export default function ScraperPelisplusSeries() {
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
     // Usar proxy local
-    let proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
     if (refererUrl) {
       proxy += `&referer=${encodeURIComponent(refererUrl)}`;
     }
@@ -88,7 +88,7 @@ export default function ScraperPelisplusSeries() {
 
   const resolveRedirect = async (targetUrl: string) => {
     try {
-      const res = await fetch(`/proxy.php?url=${encodeURIComponent(targetUrl)}&resolve_redirect=true`);
+      const res = await fetch(`/api/proxy?url=${encodeURIComponent(targetUrl)}&resolve_redirect=true`);
       if (!res.ok) return targetUrl;
       const data = await res.json();
       return data.finalUrl || targetUrl;

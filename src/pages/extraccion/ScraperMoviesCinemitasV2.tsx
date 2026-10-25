@@ -31,7 +31,7 @@ export default function ScraperMoviesCinemitasV2() {
 
   const fetchGET = async (targetUrl: string, refererUrl: string) => {
     // Usar nuestro proxy PHP local que maneja headers correctamente
-    const proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con el proxy local`);
@@ -43,7 +43,7 @@ export default function ScraperMoviesCinemitasV2() {
   };
 
   const fetchPOSTFormData = async (targetUrl: string, body: FormData, refererUrl: string) => {
-    const proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
     const res = await fetch(proxy, { method: 'POST', body });
     if (!res.ok) throw new Error(`Error ${res.status} al conectar con el proxy local`);
 

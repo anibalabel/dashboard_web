@@ -29,7 +29,7 @@ export default function ScraperAnimeGratis() {
   };
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
-    let proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
     if (refererUrl) {
       proxy += `&referer=${encodeURIComponent(refererUrl)}`;
     }

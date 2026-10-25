@@ -23,7 +23,7 @@ export default function ScraperMoviesGnula() {
 
   const fetchHTML = async (targetUrl: string) => {
     // Usar proxy local
-    const proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
     try {
       const res = await fetch(proxy);
       if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);

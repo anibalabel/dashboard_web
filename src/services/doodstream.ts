@@ -13,7 +13,7 @@ const fetchApi = async (endpoint: string) => {
     const err = error as { code?: string; response?: unknown };
     if (err.code === 'ERR_NETWORK' || !err.response) {
       console.warn('Direct fetch failed (CORS), falling back to proxy...');
-      const proxyUrl = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+      const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
       try {
         const proxyResponse = await axios.get(proxyUrl);
         // Si la respuesta del proxy es un string, intentamos parsearlo

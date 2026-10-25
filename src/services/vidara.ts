@@ -108,7 +108,7 @@ export interface VidaraUploadParams {
 
 const executeApi = async (endpoint: string): Promise<any> => {
   const targetUrl = `${BASE_URL}${endpoint}`;
-  const proxyUrl = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
 
   try {
     const response = await axios.get(proxyUrl, { timeout: 35000 });

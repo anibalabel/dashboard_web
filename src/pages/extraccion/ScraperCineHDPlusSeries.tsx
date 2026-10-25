@@ -26,7 +26,7 @@ export default function ScraperCineHDPlusSeries() {
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
     // Usar proxy local
-    let proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+    let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
     if (refererUrl) {
       proxy += `&referer=${encodeURIComponent(refererUrl)}`;
     }
@@ -43,7 +43,7 @@ export default function ScraperCineHDPlusSeries() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fetchPOST = async (targetUrl: string, body: URLSearchParams, refererUrl: string) => {
     // Usar nuestro proxy PHP local para peticiones POST complejas
-    const proxy = `/proxy.php?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
+    const proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererUrl)}`;
     
     try {
       const res = await fetch(proxy, {
