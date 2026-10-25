@@ -12,6 +12,7 @@ interface ScrapedResult {
   serverName: string;
 }
 
+
 interface EpisodeLink {
   name: string;
   url: string;
