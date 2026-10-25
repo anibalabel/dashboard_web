@@ -16,9 +16,10 @@ export const DashboardChart = ({ data }: DashboardChartProps) => {
   ];
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-[400px]">
+    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
       <h3 className="text-lg font-bold text-gray-900 mb-6">Distribución de Contenido</h3>
-      <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full h-[320px]">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <BarChart
           data={chartData}
           margin={{
@@ -58,6 +59,7 @@ export const DashboardChart = ({ data }: DashboardChartProps) => {
           <Bar dataKey="animes" name="Animes" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={60} />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 };

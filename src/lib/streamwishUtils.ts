@@ -133,6 +133,10 @@ export function subscribeStreamwishConfig(callback: (baseUrl: string) => void): 
             callback(normalized);
           }
         }, (err) => {
+          // Si Firebase no tiene permisos públicos de lectura, usamos la configuración local sin saturar la consola
+          if (err && (err.message?.includes('permission_denied') || (err as any).code === 'PERMISSION_DENIED')) {
+            return;
+          }
           console.warn('Error leyendo Streamwish config de Firebase:', err);
         });
       })
