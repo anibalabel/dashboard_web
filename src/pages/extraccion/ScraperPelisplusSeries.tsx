@@ -104,105 +104,197 @@ export default function ScraperPelisplusSeries() {
     setResults([]);
 
     try {
-      // 1. Lectura de la URL principal
-      addLog(`Iniciando petición a: ${url}`);
-      const html = await fetchHTML(url);
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const cleanUrl = url.split('#')[0].trim();
+      addLog(`Iniciando petición a: ${cleanUrl}`);
 
-      // 2. Búsqueda de los enlaces de los Episodios
-      addLog('Buscando enlaces de episodios en el HTML...');
-      
       const epLinks: EpisodeLink[] = [];
-      
-      // Validar si la URL ingresada es directamente la de un episodio
-      const isDirectEpisode = url.match(/-(\d+)x(\d+)(?:\/|$)/i) || url.match(/\/temporada\/(\d+)\/capitulo\/(\d+)(?:\/|$)/i) || url.match(/-temporada-(\d+)-episodio-(\d+)(?:\/|$)/i);
-      
+
+      // Validar si la URL ingresada es directamente la de un episodio clásico
+      const isDirectEpisode =
+        cleanUrl.match(/-(\d+)x(\d+)(?:\/|$)/i) ||
+        cleanUrl.match(/\/temporada\/(\d+)\/capitulo\/(\d+)(?:\/|$)/i) ||
+        cleanUrl.match(/-temporada-(\d+)-episodio-(\d+)(?:\/|$)/i) ||
+        cleanUrl.match(/\/episodio\/(\d+)\/(\d+)(?:\/|$)/i);
+
       if (isDirectEpisode) {
-        // Es un enlace directo a un episodio
-        const s = parseInt(isDirectEpisode[1]);
-        const e = parseInt(isDirectEpisode[2]);
-        epLinks.push({ season: s, episode: e, url: url });
+        const s = parseInt(isDirectEpisode[1], 10);
+        const e = parseInt(isDirectEpisode[2], 10);
+        epLinks.push({ season: s, episode: e, url: cleanUrl });
         addLog(`Se detectó URL directa de episodio: S${s}xE${e}`);
       } else {
-        // En Pelisplus las temporadas suelen estar en div.tab-pane o similares
-        // y los episodios en enlaces con href=/episodio/... o /serie/nombre/temporada/1/capitulo/1
-        // También puede ser simplemente href="/episodio/..."
-        const links = Array.from(doc.querySelectorAll('a[href*="/episodio/"], a[href*="/capitulo/"]'));
+        // 1. Descarga del HTML de la serie
+        const html = await fetchHTML(cleanUrl);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
 
-        if (links.length === 0) {
-          // Intentar otra estrategia si no encuentra los enlaces con los selectores anteriores
-          // A veces los enlaces están en li a dentro de ul con clase episodes
-          const allLinks = Array.from(doc.querySelectorAll('a'));
-          allLinks.forEach(a => {
+        addLog('Buscando temporadas y episodios en el HTML...');
+
+        // 2. Detectar endpoint dinámico de episodios (nuevo sistema Pelisplus SPA)
+        const episodeArea = doc.querySelector('#episode-area');
+        let endpoint = episodeArea?.getAttribute('data-endpoint') || '';
+        if (!endpoint) {
+          const endpointMatch =
+            html.match(/id=["']episode-area["'][^>]*data-endpoint=["']([^"']+)["']/i) ||
+            html.match(/data-endpoint=["']([^"']+)["']/i);
+          if (endpointMatch) {
+            endpoint = endpointMatch[1];
+          } else {
+            endpoint = `${cleanUrl.replace(/\/+$/, '')}/episodio`;
+          }
+        }
+        if (endpoint.startsWith('/')) {
+          endpoint = new URL(endpoint, cleanUrl).href;
+        }
+
+        // 3. Extraer episodios modernos (enlaces con data-season, data-episode o clase episode-link)
+        const modernLinks = Array.from(
+          doc.querySelectorAll<HTMLAnchorElement>(
+            'a[data-episode-link], a.episode-link, a[data-season][data-episode], .tab-pane a[href*="#s"], .tab-content a[href*="#s"], .VideoPlayer ~ .tab-content a'
+          )
+        );
+
+        modernLinks.forEach(a => {
+          let s = parseInt(a.getAttribute('data-season') || '', 10);
+          let e = parseInt(a.getAttribute('data-episode') || '', 10);
+          const href = a.getAttribute('href') || '';
+
+          if (isNaN(s) || s <= 0) {
+            const hashMatch = href.match(/#s(\d+)-e(\d+)/i);
+            if (hashMatch) {
+              s = parseInt(hashMatch[1], 10);
+              if (isNaN(e) || e <= 0) e = parseInt(hashMatch[2], 10);
+            }
+          }
+
+          if (isNaN(s) || s <= 0) {
+            const pane = a.closest('.tab-pane, [id^="temporada-"]');
+            const paneId = pane?.getAttribute('id') || '';
+            const tempMatch = paneId.match(/temporada-(\d+)/i);
+            if (tempMatch) s = parseInt(tempMatch[1], 10);
+          }
+
+          if (isNaN(s) || s <= 0) {
+            const textMatch = (a.textContent || '').match(/T(\d+)\s*-\s*E(\d+)/i);
+            if (textMatch) {
+              s = parseInt(textMatch[1], 10);
+              if (isNaN(e) || e <= 0) e = parseInt(textMatch[2], 10);
+            }
+          }
+
+          if (isNaN(e) || e <= 0) {
+            const textMatch = (a.textContent || '').match(/(?:E|Episodio|Cap[ií]tulo)\s*(\d+)/i);
+            if (textMatch) e = parseInt(textMatch[1], 10);
+          }
+
+          if (s > 0 && e > 0) {
+            if (!epLinks.some(ep => ep.season === s && ep.episode === e)) {
+              epLinks.push({
+                season: s,
+                episode: e,
+                url: `${endpoint}/${s}/${e}`
+              });
+            }
+          }
+        });
+
+        // 4. Fallback: buscar enlaces clásicos con href conteniendo /episodio/ o /capitulo/
+        if (epLinks.length === 0) {
+          const legacyLinks = Array.from(doc.querySelectorAll<HTMLAnchorElement>('a[href*="/episodio/"], a[href*="/capitulo/"]'));
+          legacyLinks.forEach(a => {
             const href = a.getAttribute('href') || '';
-            if (href.includes('/episodio/') || href.includes('/capitulo/')) {
-              links.push(a);
+            if (!href) return;
+
+            const fullUrl = href.startsWith('http') ? href : new URL(href, cleanUrl).href;
+
+            const match1 = fullUrl.match(/-(\d+)x(\d+)(?:\/|$)/i);
+            const match2 = fullUrl.match(/\/temporada\/(\d+)\/capitulo\/(\d+)(?:\/|$)/i);
+            const match3 = fullUrl.match(/-temporada-(\d+)-episodio-(\d+)(?:\/|$)/i);
+
+            let s = 0, e = 0;
+            if (match1) {
+              s = parseInt(match1[1], 10);
+              e = parseInt(match1[2], 10);
+            } else if (match2) {
+              s = parseInt(match2[1], 10);
+              e = parseInt(match2[2], 10);
+            } else if (match3) {
+              s = parseInt(match3[1], 10);
+              e = parseInt(match3[2], 10);
+            }
+
+            if (s > 0 && e > 0) {
+              if (!epLinks.some(ep => ep.season === s && ep.episode === e)) {
+                epLinks.push({ season: s, episode: e, url: fullUrl });
+              }
             }
           });
         }
 
-        links.forEach(a => {
-          const href = a.getAttribute('href') || '';
-          if (!href) return;
-          
-          const fullUrl = href.startsWith('http') ? href : new URL(href, url).href;
-          
-          // Formato 1: termina en -1x1 o similar (ej. /episodio/serie-1x1)
-          const match1 = fullUrl.match(/-(\d+)x(\d+)(?:\/|$)/i);
-          // Formato 2: /temporada/1/capitulo/1
-          const match2 = fullUrl.match(/\/temporada\/(\d+)\/capitulo\/(\d+)(?:\/|$)/i);
-          // Formato 3: /episodio/pluribus-temporada-1-episodio-1
-          const match3 = fullUrl.match(/-temporada-(\d+)-episodio-(\d+)(?:\/|$)/i);
-          
-          let s = 0, e = 0;
-          
-          if (match1) {
-            s = parseInt(match1[1]);
-            e = parseInt(match1[2]);
-          } else if (match2) {
-            s = parseInt(match2[1]);
-            e = parseInt(match2[2]);
-          } else if (match3) {
-            s = parseInt(match3[1]);
-            e = parseInt(match3[2]);
-          }
-          
-          if (s > 0 && e > 0) {
-            if (!epLinks.some(ep => ep.season === s && ep.episode === e)) {
-              epLinks.push({ season: s, episode: e, url: fullUrl });
+        // 5. Fallback adicional con Regex directamente sobre el HTML crudo
+        if (epLinks.length === 0) {
+          const hashMatches = Array.from(html.matchAll(/href=["']#s(\d+)-e(\d+)["']/gi));
+          for (const m of hashMatches) {
+            const s = parseInt(m[1], 10);
+            const e = parseInt(m[2], 10);
+            if (s > 0 && e > 0 && !epLinks.some(x => x.season === s && x.episode === e)) {
+              epLinks.push({ season: s, episode: e, url: `${endpoint}/${s}/${e}` });
             }
           }
-        });
+
+          const dataMatches = Array.from(html.matchAll(/data-season=["'](\d+)["'][^>]*data-episode=["'](\d+)["']/gi));
+          for (const m of dataMatches) {
+            const s = parseInt(m[1], 10);
+            const e = parseInt(m[2], 10);
+            if (s > 0 && e > 0 && !epLinks.some(x => x.season === s && x.episode === e)) {
+              epLinks.push({ season: s, episode: e, url: `${endpoint}/${s}/${e}` });
+            }
+          }
+        }
       }
 
-      // Filtrar y ordenar
+      // Loggear temporadas detectadas
+      const seasonsFound = Array.from(new Set(epLinks.map(ep => ep.season))).sort((a, b) => a - b);
+      if (seasonsFound.length > 0) {
+        addLog(`Temporadas encontradas: ${seasonsFound.join(', ')} (Total: ${epLinks.length} episodios detectados)`);
+      }
+
+      // Filtrar por temporada específica y límite
       let filtered = epLinks;
       if (targetSeason) {
         filtered = filtered.filter(ep => ep.season === Number(targetSeason));
+        addLog(`Filtrado por Temporada ${targetSeason}: ${filtered.length} episodios.`);
       }
       filtered.sort((a, b) => a.season === b.season ? a.episode - b.episode : a.season - b.season);
       if (limit) {
         filtered = filtered.slice(0, Number(limit));
+        addLog(`Límite aplicado: ${filtered.length} episodios.`);
       }
 
-      addLog(`Se encontraron ${filtered.length} episodios válidos para procesar.`);
+      addLog(`Se procesarán ${filtered.length} episodios con el servidor '${targetServer.toUpperCase()}'.`);
 
-      // 3. & 4. & 5. Loop para obtener iframe y enlaces finales
+      // 6. Loop para obtener iframes y enlaces finales
       const finalResults: ScrapedResult[] = [];
 
       for (const ep of filtered) {
         addLog(`Procesando S${ep.season}xE${ep.episode}...`);
         try {
-          const epHtml = await fetchHTML(ep.url);
-          
-          // Normalizar el HTML eliminando saltos de línea y tabulaciones múltiples para facilitar la búsqueda
+          const epRaw = await fetchHTML(ep.url, cleanUrl);
+
+          // Si el endpoint devolvió JSON (API interna de Pelisplus), extraemos el HTML
+          let epHtml = epRaw;
+          try {
+            const parsedJson = JSON.parse(epRaw);
+            if (parsedJson && parsedJson.data && parsedJson.data.html) {
+              epHtml = parsedJson.data.html;
+            }
+          } catch {
+            // Es HTML plano (diseño tradicional)
+          }
+
+          // Normalizar el HTML eliminando saltos de línea y tabulaciones múltiples
           const normalizedHtml = epHtml.replace(/\s+/g, ' ');
 
-          // Log para depuración
-          const rawVideoLine = normalizedHtml.match(/video\[1\][^;]+;/i);
-          if (rawVideoLine) {
-            addLog(`S${ep.season}xE${ep.episode} crudo: ${rawVideoLine[0].substring(0, 100)}...`);
-          }
+          // Extraer todos los data-src presentes en los servidores del episodio
+          const dataSrcList = Array.from(epHtml.matchAll(/data-src=['"]([^'"]+)['"]/gi)).map(m => m[1].trim());
 
           if (targetServer.toLowerCase() === 'uqload') {
             addLog(`Buscando enlace de redirección / iframe para Uqload en S${ep.season}xE${ep.episode}...`);
@@ -210,17 +302,25 @@ export default function ScraperPelisplusSeries() {
             let uqlinkUrl = '';
             let directUqloadUrl = '';
 
+            // 0. Revisar data-src directo de Uqload
+            const uqDataSrc = dataSrcList.find(s => /uqload\.[a-z0-9]+/i.test(s));
+            if (uqDataSrc) {
+              directUqloadUrl = uqDataSrc;
+            }
+
             // 1. Buscar en variables video[N]
-            const videoMatches = Array.from(normalizedHtml.matchAll(/video\[(\d+)\]\s*=\s*['"]([^'"]+)['"]/gi));
-            for (const match of videoMatches) {
-              const vUrl = match[2].trim();
-              if (/uqlink\.php\?id=/i.test(vUrl)) {
-                uqlinkUrl = vUrl;
-                break;
-              }
-              if (/uqload\.[a-z0-9]+/i.test(vUrl)) {
-                directUqloadUrl = vUrl;
-                break;
+            if (!directUqloadUrl) {
+              const videoMatches = Array.from(normalizedHtml.matchAll(/video\[(\d+)\]\s*=\s*['"]([^'"]+)['"]/gi));
+              for (const match of videoMatches) {
+                const vUrl = match[2].trim();
+                if (/uqlink\.php\?id=/i.test(vUrl)) {
+                  uqlinkUrl = vUrl;
+                  break;
+                }
+                if (/uqload\.[a-z0-9]+/i.test(vUrl)) {
+                  directUqloadUrl = vUrl;
+                  break;
+                }
               }
             }
 
@@ -310,77 +410,64 @@ export default function ScraperPelisplusSeries() {
             }
           }
 
-          // Buscar la variable JavaScript que contiene el iframe de embed69
+          // Buscar la variable JavaScript o atributo que contiene el iframe de Embed69
+          let embedUrl = dataSrcList.find(s => /embed69/i.test(s) || /^\/(?:f|v)\//i.test(s)) || '';
+
           // Intento 1: Regex exacta del PHP original
-          const phpRegexMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"]([^'"]+)['"]/i);
-          let embedUrl = '';
-          
-          if (phpRegexMatch) {
-            embedUrl = phpRegexMatch[1];
+          if (!embedUrl) {
+            const phpRegexMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"]([^'"]+)['"]/i);
+            if (phpRegexMatch) embedUrl = phpRegexMatch[1];
           }
 
           // Intento 2: Buscar cualquier texto dentro de video[1] = '...' que contenga embed69
           if (!embedUrl) {
             const embed69Match = normalizedHtml.match(/video\[1\]\s*=\s*[^;]*?(https?:\/\/embed69[^'"`\s;]+)/i);
-            if (embed69Match) {
-              embedUrl = embed69Match[1];
-            }
+            if (embed69Match) embedUrl = embed69Match[1];
           }
 
-          // Intento 3: Acepta comillas simples, dobles, backticks o la variable inicio concatenada
+          // Intento 3: Acepta comillas simples, dobles, backticks o concatenación
           if (!embedUrl) {
             const videoMatch = normalizedHtml.match(/video\[1\]\s*=\s*(?:['"`]([^'"`]+)['"`]|inicio\s*\+\s*['"`]([^'"`]+)['"`]|['"`][^'"`]+['"`]\s*\+\s*['"`]([^'"`]+)['"`])/i);
-            if (videoMatch) {
-              embedUrl = videoMatch[1] || videoMatch[2] || videoMatch[3] || '';
-            }
+            if (videoMatch) embedUrl = videoMatch[1] || videoMatch[2] || videoMatch[3] || '';
           }
 
           if (!embedUrl) {
-            // Intento secundario más permisivo (busca URLs directas de embed69 dentro de video[1])
             const fallbackMatch = normalizedHtml.match(/video\[1\]\s*=\s*[^;]*?(https?:\/\/embed69[^\s'"`]+)/i) || 
                                   normalizedHtml.match(/video\[1\]\s*=\s*[^;]*?(\/f\/[^\s'"`]+)/i) ||
                                   normalizedHtml.match(/video\[1\]\s*=\s*[^;]*?(\/v\/[^\s'"`]+)/i);
-            if (fallbackMatch) {
-              embedUrl = fallbackMatch[1];
-            }
+            if (fallbackMatch) embedUrl = fallbackMatch[1];
           }
 
-          // Intento 3.5: A veces hay espacios, saltos de línea o tabulaciones extrañas entre video[1] y el valor
           if (!embedUrl) {
-             const looseMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"`]\s*([^'"`]+)\s*['"`]/i);
-             if (looseMatch) {
-               embedUrl = looseMatch[1].trim();
-             }
+            const looseMatch = normalizedHtml.match(/video\[1\]\s*=\s*['"`]\s*([^'"`]+)\s*['"`]/i);
+            if (looseMatch) embedUrl = looseMatch[1].trim();
           }
-          
-          // Tercer intento: A veces está en un iframe directamente en el HTML y no en la variable video[1]
-            if (!embedUrl) {
-              const iframeMatch = normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*embed69[^'"]*)['"]/i) ||
-                                  normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*\/f\/[^'"]*)['"]/i) ||
-                                  normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*\/v\/[^'"]*)['"]/i);
-              if (iframeMatch) {
-                embedUrl = iframeMatch[1];
-              }
-            }
 
-            // Intento 3.5: Usar DOM Parser para buscar el iframe directamente
-            if (!embedUrl) {
-              const doc = new DOMParser().parseFromString(epHtml, 'text/html');
-              const iframe = doc.querySelector('.video-html iframe, #video-content iframe, iframe[src*="embed69"]');
-              if (iframe) {
-                const src = iframe.getAttribute('src');
-                if (src) embedUrl = src;
-              }
+          if (!embedUrl) {
+            const iframeMatch = normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*embed69[^'"]*)['"]/i) ||
+                                normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*\/f\/[^'"]*)['"]/i) ||
+                                normalizedHtml.match(/<iframe[^>]+src=['"]([^'"]*\/v\/[^'"]*)['"]/i);
+            if (iframeMatch) embedUrl = iframeMatch[1];
+          }
+
+          if (!embedUrl) {
+            const doc = new DOMParser().parseFromString(epHtml, 'text/html');
+            const iframe = doc.querySelector('.video-html iframe, #video-content iframe, iframe[src*="embed69"]');
+            if (iframe) {
+              const src = iframe.getAttribute('src');
+              if (src) embedUrl = src;
             }
-          
-          // Intento 4: Búsqueda cruda de cualquier URL de embed69 en el HTML (muy permisivo)
-            if (!embedUrl) {
-               const rawMatch = normalizedHtml.match(/(https?:\/\/embed69[^'"`\s<>]+)/i) || 
-                                normalizedHtml.match(/['"`](\/f\/[^'"`\s<>]+)['"`]/i);
-               if (rawMatch) {
-                  embedUrl = rawMatch[1];
-               }
-            }
+          }
+
+          if (!embedUrl && dataSrcList.length > 0) {
+            embedUrl = dataSrcList[0];
+          }
+
+          if (!embedUrl) {
+            const rawMatch = normalizedHtml.match(/(https?:\/\/embed69[^'"`\s<>]+)/i) || 
+                             normalizedHtml.match(/['"`](\/f\/[^'"`\s<>]+)['"`]/i);
+            if (rawMatch) embedUrl = rawMatch[1];
+          }
 
           if (!embedUrl) {
             addLog(`No se encontró iframe de embed69 en S${ep.season}xE${ep.episode}`, true);
@@ -390,7 +477,6 @@ export default function ScraperPelisplusSeries() {
           // Limpiar si trae comillas invertidas por error
           embedUrl = embedUrl.replace(/`/g, '').trim();
 
-          // Si el embedUrl empieza con / (relativo), probablemente falta el dominio de embed69
           if (embedUrl.startsWith('/f/') || embedUrl.startsWith('/v/')) {
             embedUrl = 'https://embed69.org' + embedUrl;
           } else if (embedUrl.startsWith('//')) {
@@ -400,14 +486,14 @@ export default function ScraperPelisplusSeries() {
           addLog(`Obteniendo reproductor Embed69 para S${ep.season}xE${ep.episode}...`);
           
           // Petición al iframe de embed69 (necesita referer de pelisplus para evitar 403 Forbidden)
-          const iframeHtml = await fetchHTML(embedUrl, ep.url);
+          const iframeHtml = await fetchHTML(embedUrl, ep.url || cleanUrl);
 
-          const parsedData = await parseAndDecryptEmbed69(iframeHtml, () => {
-            addLog(`Verificando encriptación PoW + AES para S${ep.season}xE${ep.episode}...`);
+          const parsedData = await parseAndDecryptEmbed69(iframeHtml, (stepMsg) => {
+            addLog(`S${ep.season}xE${ep.episode}: ${stepMsg || 'Descifrando PoW + AES...'}`);
           });
 
           if (!parsedData || parsedData.length === 0) {
-            addLog(`No se encontraron datos JSON en Embed69 S${ep.season}xE${ep.episode}`, true);
+            addLog(`No se encontraron datos de video en Embed69 S${ep.season}xE${ep.episode}`, true);
             continue;
           }
 
@@ -415,49 +501,39 @@ export default function ScraperPelisplusSeries() {
           let castUrl = null;
           let subUrl = null;
 
-          // El formato de dataLink es: [{ file_id: X, video_language: "ESP", sortedEmbeds: [{servername: "voe", link: "..."}, ...] }]
-          // Iteramos sobre los objetos principales de idioma
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           for (const langGroup of parsedData) {
-             const langName = String(langGroup.video_language || langGroup.lang || '').toUpperCase();
-             const embeds = langGroup.sortedEmbeds || [];
+            const langName = String(langGroup.video_language || langGroup.lang || '').toUpperCase();
+            const embeds = langGroup.sortedEmbeds || [];
 
-             // Buscamos un enlace válido dentro de este idioma que coincida con el servidor seleccionado
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             for (const server of embeds) {
-               if (!server.link) continue;
-               
-               // Filtrar por el servidor seleccionado (case insensitive)
-               if (String(server.servername).toLowerCase() !== targetServer.toLowerCase()) continue;
-               
-               try {
-                  let cleanUrl = extractCleanUrlFromEmbedLink(server.link);
-                  if (cleanUrl) {
-                     // Resolve Streamwish redirects
-                     if (String(server.servername).toLowerCase() === 'streamwish') {
-                         addLog(`Resolviendo redirección de Streamwish...`);
-                         cleanUrl = await resolveRedirect(cleanUrl);
-                     }
-                     
-                     cleanUrl = formatDoodstreamUrl(cleanUrl, targetServer || server.servername);
-                     
-                     // Clasificar por idioma basado en video_language
-                     if (langName === 'LAT' || langName === 'LATINO') {
-                       if (!latUrl) latUrl = cleanUrl;
-                     } else if (langName === 'ESP' || langName === 'CASTELLANO') {
-                       if (!castUrl) castUrl = cleanUrl;
-                     } else if (langName === 'SUB' || langName === 'SUBTITULADO') {
-                       if (!subUrl) subUrl = cleanUrl;
-                     } else {
-                       // Fallback si no identificamos
-                       if (!latUrl) latUrl = cleanUrl;
-                     }
+            for (const server of embeds) {
+              if (!server.link) continue;
+              if (String(server.servername).toLowerCase() !== targetServer.toLowerCase()) continue;
+
+              try {
+                let cleanUrl = extractCleanUrlFromEmbedLink(server.link);
+                if (cleanUrl) {
+                  if (String(server.servername).toLowerCase() === 'streamwish') {
+                    addLog(`Resolviendo redirección de Streamwish...`);
+                    cleanUrl = await resolveRedirect(cleanUrl);
                   }
-               } catch (e) {
-                  console.error("Error procesando enlace de servidor", e);
-                  addLog(`Error al procesar enlace para ${server.servername}: ${e instanceof Error ? e.message : 'Error desconocido'}`);
-               }
-             }
+
+                  cleanUrl = formatDoodstreamUrl(cleanUrl, targetServer || server.servername);
+
+                  if (langName === 'LAT' || langName === 'LATINO') {
+                    if (!latUrl) latUrl = cleanUrl;
+                  } else if (langName === 'ESP' || langName === 'CASTELLANO') {
+                    if (!castUrl) castUrl = cleanUrl;
+                  } else if (langName === 'SUB' || langName === 'SUBTITULADO') {
+                    if (!subUrl) subUrl = cleanUrl;
+                  } else {
+                    if (!latUrl) latUrl = cleanUrl;
+                  }
+                }
+              } catch (e) {
+                console.error("Error procesando enlace de servidor", e);
+                addLog(`Error al procesar enlace para ${server.servername}: ${e instanceof Error ? e.message : 'Error desconocido'}`);
+              }
+            }
           }
 
           if (latUrl || castUrl || subUrl) {
