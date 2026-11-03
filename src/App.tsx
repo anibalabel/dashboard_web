@@ -5,6 +5,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import RegistroDoble from "@/pages/series/RegistroDoble";
 import RegistroDobleUpdate from "@/pages/series/RegistroDobleUpdate";
 import RegistroDooplex from "@/pages/series/RegistroDooplex";
+import RegistroDooplexV2 from "@/pages/series/RegistroDooplexV2";
 import RegistroDocines from "@/pages/series/RegistroDocines";
 import RegistroAnime from "@/pages/series/RegistroAnime";
 import UrlsAnime from "@/pages/series/UrlsAnime";
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/series/registro-doble" element={<RegistroDoble />} />
           <Route path="/series/registro-doble-update" element={<RegistroDobleUpdate />} />
           <Route path="/series/registro-dooplex" element={<RegistroDooplex />} />
+          <Route path="/series/registro-dooplex-v2" element={<RegistroDooplexV2 />} />
           <Route path="/series/registro-docines" element={<RegistroDocines />} />
           <Route path="/series/registro-anime" element={<RegistroAnime />} />
           <Route path="/series/urls-anime" element={<UrlsAnime />} />

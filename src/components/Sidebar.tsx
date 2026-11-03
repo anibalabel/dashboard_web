@@ -91,6 +91,18 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Registro Dooplex
                 </Link>
                 <Link
+                  to="/series/registro-dooplex-v2"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/series/registro-dooplex-v2'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Clapperboard className="h-4 w-4" />
+                  Registro Dooplex V2
+                </Link>
+                <Link
                   to="/series/registro-anime"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
