@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, FormEvent } from 'react';
-import { Search, PlayCircle, Loader2, CheckCircle, AlertCircle, ListVideo } from 'lucide-react';
+import { Search, PlayCircle, Loader2, CheckCircle, AlertCircle, ListVideo, Ban, Plus, X, RotateCcw } from 'lucide-react';
 import {
   getDooplexSeries,
   getDooplexSeasons,
@@ -11,6 +11,9 @@ import {
   DooplexSeason,
   DooplexEpisode
 } from '../../types';
+
+const DEFAULT_EXCLUDED_SERVERS = ['doodstream', 'waaw', 'dsvplay'];
+const STORAGE_KEY_EXCLUDED = 'dooplex_v2_excluded_servers';
 
 interface ParsedLinkItem {
   episodeNumber: number | null;
@@ -26,6 +29,12 @@ interface ParsedEpisodeGroup {
   episodeNumber: number | null;
   title: string;
   items: ParsedLinkItem[];
+}
+
+interface ParseResult {
+  groups: ParsedEpisodeGroup[];
+  detectedServers: string[];
+  discardedCount: number;
 }
 
 function mapLanguage(rawLang: string): 'CAST' | 'LAT' | 'SUB' {
@@ -56,10 +65,26 @@ function mapSource(header: string, link: string): 'embed' | 'supported_hosts' {
   return 'embed';
 }
 
-function parseEpisodesText(rawText: string, skipDuplicates: boolean): ParsedEpisodeGroup[] {
+function isServerExcluded(header: string, link: string, excludedServers: string[]): boolean {
+  const h = header.trim().toLowerCase();
+  const l = link.trim().toLowerCase();
+  return excludedServers.some((ex) => {
+    const keyword = ex.trim().toLowerCase();
+    if (!keyword) return false;
+    return h === keyword || h.includes(keyword) || l.includes(keyword);
+  });
+}
+
+function parseEpisodesText(
+  rawText: string,
+  skipDuplicates: boolean,
+  excludedServers: string[]
+): ParseResult {
   const lines = rawText.split(/\r?\n/);
   const groups: ParsedEpisodeGroup[] = [];
+  const detectedServersSet = new Set<string>();
   let currentGroup: ParsedEpisodeGroup | null = null;
+  let discardedCount = 0;
 
   const episodeHeaderRegex = /^\s*EPISODIO\s+(\d+)(.*)$/i;
   const linkLineRegex = /^\s*(?:[•*-]\s*)?\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.+?)\s*->\s*(https?:\/\/\S+)/i;
@@ -88,6 +113,13 @@ function parseEpisodesText(rawText: string, skipDuplicates: boolean): ParsedEpis
       const link = linkMatch[4].trim();
       const lang = mapLanguage(rawLang);
       const source = mapSource(header, link);
+
+      detectedServersSet.add(header);
+
+      if (isServerExcluded(header, link, excludedServers)) {
+        discardedCount++;
+        continue;
+      }
 
       if (!currentGroup) {
         currentGroup = {
@@ -120,7 +152,11 @@ function parseEpisodesText(rawText: string, skipDuplicates: boolean): ParsedEpis
     }
   }
 
-  return groups.filter((g) => g.items.length > 0);
+  return {
+    groups: groups.filter((g) => g.items.length > 0),
+    detectedServers: Array.from(detectedServersSet),
+    discardedCount
+  };
 }
 
 export default function RegistroDooplexV2() {
@@ -145,6 +181,73 @@ export default function RegistroDooplexV2() {
   const [urls, setUrls] = useState('');
   const [skipDuplicates, setSkipDuplicates] = useState(true);
 
+  // Excluded Servers State (shared in localStorage)
+  const [excludedServers, setExcludedServers] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXCLUDED);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_EXCLUDED_SERVERS;
+  });
+  const [newExcludedInput, setNewExcludedInput] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_EXCLUDED, JSON.stringify(excludedServers));
+    } catch {
+      // ignore storage errors
+    }
+  }, [excludedServers]);
+
+  const handleAddExcludedServer = () => {
+    if (!newExcludedInput.trim()) return;
+    const parts = newExcludedInput
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    setExcludedServers((prev) => {
+      const existingLower = new Set(prev.map((p) => p.toLowerCase()));
+      const additions = parts.filter((p) => !existingLower.has(p));
+      return [...prev, ...additions];
+    });
+    setNewExcludedInput('');
+  };
+
+  const handleRemoveExcludedServer = (serverToRemove: string) => {
+    setExcludedServers((prev) =>
+      prev.filter((s) => s.toLowerCase() !== serverToRemove.toLowerCase())
+    );
+  };
+
+  const handleToggleServerFromDetected = (serverName: string) => {
+    const lower = serverName.trim().toLowerCase();
+    const isCurrentlyExcluded = excludedServers.some((s) => {
+      const k = s.trim().toLowerCase();
+      return k === lower || lower.includes(k);
+    });
+
+    if (isCurrentlyExcluded) {
+      setExcludedServers((prev) =>
+        prev.filter((s) => {
+          const k = s.trim().toLowerCase();
+          return !(k === lower || lower.includes(k));
+        })
+      );
+    } else {
+      setExcludedServers((prev) => [...prev, serverName.trim().toLowerCase()]);
+    }
+  };
+
+  const handleResetExcludedServers = () => {
+    setExcludedServers(DEFAULT_EXCLUDED_SERVERS);
+  };
+
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
   const [progress, setProgress] = useState<{
@@ -157,9 +260,9 @@ export default function RegistroDooplexV2() {
     logs: []
   });
 
-  const parsedGroups = useMemo(
-    () => parseEpisodesText(urls, skipDuplicates),
-    [urls, skipDuplicates]
+  const { groups: parsedGroups, detectedServers, discardedCount } = useMemo(
+    () => parseEpisodesText(urls, skipDuplicates, excludedServers),
+    [urls, skipDuplicates, excludedServers]
   );
 
   const totalParsedLinks = useMemo(
@@ -247,7 +350,7 @@ export default function RegistroDooplexV2() {
     }
 
     if (parsedGroups.length === 0 || totalParsedLinks === 0) {
-      alert('No se detectaron enlaces con el formato esperado: • [Calidad] [Idioma] Servidor -> https://...');
+      alert('No hay enlaces válidos para registrar (verifica el formato o los servidores descartados).');
       return;
     }
 
@@ -436,73 +539,139 @@ export default function RegistroDooplexV2() {
               </div>
             </div>
 
+            {/* Excluded Servers Management Card */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">
-                Detección Automática de Metadatos
-              </h2>
-              <div className="space-y-3 text-sm text-gray-600">
-                <p>
-                  Cada línea con formato{' '}
-                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono text-gray-800">
-                    • [1080p HD] [Español España] Voe -&gt; https://...
-                  </code>{' '}
-                  se procesa automáticamente:
-                </p>
-                <ul className="list-disc pl-5 space-y-1.5 text-xs">
-                  <li>
-                    <strong>Calidad (Server):</strong> Toma el primer corchete tal cual (ej.{' '}
-                    <code className="bg-blue-50 text-blue-700 px-1 rounded">1080p HD</code>).
-                  </li>
-                  <li>
-                    <strong>Idioma (Lang):</strong>{' '}
-                    <code className="bg-gray-100 px-1 rounded">[Español España]</code> &rarr;{' '}
-                    <strong>CAST</strong>,{' '}
-                    <code className="bg-gray-100 px-1 rounded">[Subtitulado]</code> &rarr;{' '}
-                    <strong>SUB</strong>,{' '}
-                    <code className="bg-gray-100 px-1 rounded">[Español Latino]</code> &rarr;{' '}
-                    <strong>LAT</strong>.
-                  </li>
-                  <li>
-                    <strong>Header:</strong> Toma el nombre del servidor tal como viene (ej.{' '}
-                    <code className="bg-gray-100 px-1 rounded">Voe</code>,{' '}
-                    <code className="bg-gray-100 px-1 rounded">filemoon</code>,{' '}
-                    <code className="bg-gray-100 px-1 rounded">vidmoly</code>,{' '}
-                    <code className="bg-gray-100 px-1 rounded">Vidara</code>).
-                  </li>
-                  <li>
-                    <strong>Source:</strong> Si el servidor es <strong>Vidara</strong> usa{' '}
-                    <span className="font-semibold text-emerald-700">SUPPORTED HOST</span>; para el resto usa{' '}
-                    <span className="font-semibold text-blue-700">EMBED</span>.
-                  </li>
-                </ul>
+              <div className="flex items-center justify-between mb-3 border-b pb-2">
+                <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Ban className="h-4 w-4 text-red-600" />
+                  Servidores Descartados
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleResetExcludedServers}
+                  title="Restaurar por defecto (doodstream, waaw, dsvplay)"
+                  className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Por defecto
+                </button>
+              </div>
 
-                <div className="pt-2 border-t border-gray-100">
-                  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={skipDuplicates}
-                      onChange={(e) => setSkipDuplicates(e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                    />
-                    <span className="text-xs font-medium text-gray-700">
-                      Omitir enlaces duplicados dentro del mismo episodio
-                    </span>
-                  </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Los enlaces de estos servidores se ignorarán automáticamente al pegar el texto.
+              </p>
+
+              {/* Active Excluded Tags */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {excludedServers.length === 0 && (
+                  <span className="text-xs text-gray-400 italic">No hay servidores descartados</span>
+                )}
+                {excludedServers.map((srv) => (
+                  <span
+                    key={srv}
+                    className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full text-xs font-medium"
+                  >
+                    {srv}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExcludedServer(srv)}
+                      className="hover:bg-red-200/60 rounded-full p-0.5 text-red-600"
+                      title={`Permitir ${srv}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Add new server to discard */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newExcludedInput}
+                  onChange={(e) => setNewExcludedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddExcludedServer();
+                    }
+                  }}
+                  placeholder="Agregar servidor a descartar (ej. netu, streamtape)..."
+                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-1.5 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddExcludedServer}
+                  disabled={!newExcludedInput.trim()}
+                  className="bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1 text-xs font-medium"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Descartar
+                </button>
+              </div>
+
+              {/* Quick Toggle from Detected Servers in Current Text */}
+              {detectedServers.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <span className="block text-xs font-medium text-gray-700 mb-2">
+                    Servidores detectados en el texto (clic para descartar / activar):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detectedServers.map((srv) => {
+                      const isEx = isServerExcluded(srv, '', excludedServers);
+                      return (
+                        <button
+                          key={srv}
+                          type="button"
+                          onClick={() => handleToggleServerFromDetected(srv)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1 ${
+                            isEx
+                              ? 'bg-red-50 text-red-700 border-red-200 line-through opacity-80 hover:bg-red-100'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {isEx ? <Ban className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                          {srv}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={skipDuplicates}
+                    onChange={(e) => setSkipDuplicates(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  />
+                  <span className="text-xs font-medium text-gray-700">
+                    Omitir enlaces duplicados dentro del mismo episodio
+                  </span>
+                </label>
               </div>
             </div>
 
             {/* Preview of Parsed Episodes */}
-            {parsedGroups.length > 0 && (
+            {(parsedGroups.length > 0 || discardedCount > 0) && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-3 border-b pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 border-b pb-2">
                   <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                     <ListVideo className="h-4 w-4 text-blue-600" />
                     Vista Previa Detectada
                   </h2>
-                  <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-full">
-                    {parsedGroups.length} ep. / {totalParsedLinks} enlaces
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-full">
+                      {parsedGroups.length} ep. / {totalParsedLinks} activos
+                    </span>
+                    {discardedCount > 0 && (
+                      <span className="text-xs bg-red-50 text-red-700 font-semibold px-2.5 py-1 rounded-full">
+                        {discardedCount} descartados
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
