@@ -8,6 +8,7 @@ import RegistroDooplex from "@/pages/series/RegistroDooplex";
 import RegistroDooplexV2 from "@/pages/series/RegistroDooplexV2";
 import RegistroDocines from "@/pages/series/RegistroDocines";
 import RegistroAnime from "@/pages/series/RegistroAnime";
+import RegistroAnimeV2 from "@/pages/series/RegistroAnimeV2";
 import UrlsAnime from "@/pages/series/UrlsAnime";
 import UrlsAnimeUpdate from "@/pages/series/UrlsAnimeUpdate";
 import UrlsDooplex from "@/pages/series/UrlsDooplex";
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/series/registro-dooplex-v2" element={<RegistroDooplexV2 />} />
           <Route path="/series/registro-docines" element={<RegistroDocines />} />
           <Route path="/series/registro-anime" element={<RegistroAnime />} />
+          <Route path="/series/registro-anime-v2" element={<RegistroAnimeV2 />} />
           <Route path="/series/urls-anime" element={<UrlsAnime />} />
           <Route path="/series/urls-anime-update" element={<UrlsAnimeUpdate />} />
           <Route path="/series/urls-plusmovie" element={<UrlsPlusmovie />} />
