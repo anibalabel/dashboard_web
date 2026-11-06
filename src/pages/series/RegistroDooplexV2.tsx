@@ -15,6 +15,14 @@ import {
 const DEFAULT_EXCLUDED_SERVERS = ['doodstream', 'waaw', 'dsvplay'];
 const STORAGE_KEY_EXCLUDED = 'dooplex_v2_excluded_servers';
 
+const DEFAULT_EXCLUDED_LANGS: string[] = [];
+const STORAGE_KEY_EXCLUDED_LANGS = 'dooplex_v2_excluded_langs';
+const STANDARD_LANGS: { code: 'LAT' | 'CAST' | 'SUB'; label: string }[] = [
+  { code: 'LAT', label: 'LAT (Latino)' },
+  { code: 'CAST', label: 'CAST (Castellano)' },
+  { code: 'SUB', label: 'SUB (Subtitulado)' }
+];
+
 interface ParsedLinkItem {
   episodeNumber: number | null;
   server: string; // Calidad (Server), ej: "1080p HD"
@@ -34,6 +42,7 @@ interface ParsedEpisodeGroup {
 interface ParseResult {
   groups: ParsedEpisodeGroup[];
   detectedServers: string[];
+  detectedLangs: ('CAST' | 'LAT' | 'SUB')[];
   discardedCount: number;
 }
 
@@ -75,14 +84,41 @@ function isServerExcluded(header: string, link: string, excludedServers: string[
   });
 }
 
+function isLanguageExcluded(lang: 'CAST' | 'LAT' | 'SUB', rawLang: string, excludedLangs: string[]): boolean {
+  const normLang = lang.trim().toLowerCase();
+  const normRaw = rawLang.trim().toLowerCase();
+  return excludedLangs.some((ex) => {
+    const keyword = ex.trim().toLowerCase();
+    if (!keyword) return false;
+    if (keyword === normLang || keyword === normRaw || normRaw.includes(keyword)) {
+      return true;
+    }
+    if (
+      (keyword === 'castellano' || keyword === 'español españa' || keyword === 'espana' || keyword === 'españa') &&
+      lang === 'CAST'
+    ) {
+      return true;
+    }
+    if ((keyword === 'latino' || keyword === 'español latino') && lang === 'LAT') {
+      return true;
+    }
+    if ((keyword === 'subtitulado' || keyword === 'vose') && lang === 'SUB') {
+      return true;
+    }
+    return false;
+  });
+}
+
 function parseEpisodesText(
   rawText: string,
   skipDuplicates: boolean,
-  excludedServers: string[]
+  excludedServers: string[],
+  excludedLangs: string[]
 ): ParseResult {
   const lines = rawText.split(/\r?\n/);
   const groups: ParsedEpisodeGroup[] = [];
   const detectedServersSet = new Set<string>();
+  const detectedLangsSet = new Set<'CAST' | 'LAT' | 'SUB'>();
   let currentGroup: ParsedEpisodeGroup | null = null;
   let discardedCount = 0;
 
@@ -115,8 +151,12 @@ function parseEpisodesText(
       const source = mapSource(header, link);
 
       detectedServersSet.add(header);
+      detectedLangsSet.add(lang);
 
-      if (isServerExcluded(header, link, excludedServers)) {
+      if (
+        isServerExcluded(header, link, excludedServers) ||
+        isLanguageExcluded(lang, rawLang, excludedLangs)
+      ) {
         discardedCount++;
         continue;
       }
@@ -155,6 +195,7 @@ function parseEpisodesText(
   return {
     groups: groups.filter((g) => g.items.length > 0),
     detectedServers: Array.from(detectedServersSet),
+    detectedLangs: Array.from(detectedLangsSet),
     discardedCount
   };
 }
@@ -248,6 +289,66 @@ export default function RegistroDooplexV2() {
     setExcludedServers(DEFAULT_EXCLUDED_SERVERS);
   };
 
+  // Excluded Languages State (shared in localStorage)
+  const [excludedLangs, setExcludedLangs] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXCLUDED_LANGS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_EXCLUDED_LANGS;
+  });
+  const [newExcludedLangInput, setNewExcludedLangInput] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_EXCLUDED_LANGS, JSON.stringify(excludedLangs));
+    } catch {
+      // ignore storage errors
+    }
+  }, [excludedLangs]);
+
+  const handleAddExcludedLang = () => {
+    if (!newExcludedLangInput.trim()) return;
+    const parts = newExcludedLangInput
+      .split(',')
+      .map((l) => l.trim().toUpperCase())
+      .filter(Boolean);
+
+    setExcludedLangs((prev) => {
+      const existingUpper = new Set(prev.map((p) => p.toUpperCase()));
+      const additions = parts.filter((p) => !existingUpper.has(p));
+      return [...prev, ...additions];
+    });
+    setNewExcludedLangInput('');
+  };
+
+  const handleRemoveExcludedLang = (langToRemove: string) => {
+    setExcludedLangs((prev) =>
+      prev.filter((l) => l.toLowerCase() !== langToRemove.toLowerCase())
+    );
+  };
+
+  const handleToggleLang = (langCode: 'CAST' | 'LAT' | 'SUB') => {
+    const isCurrentlyExcluded = isLanguageExcluded(langCode, langCode, excludedLangs);
+
+    if (isCurrentlyExcluded) {
+      setExcludedLangs((prev) =>
+        prev.filter((ex) => !isLanguageExcluded(langCode, langCode, [ex]))
+      );
+    } else {
+      setExcludedLangs((prev) => [...prev, langCode]);
+    }
+  };
+
+  const handleResetExcludedLangs = () => {
+    setExcludedLangs(DEFAULT_EXCLUDED_LANGS);
+  };
+
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
   const [progress, setProgress] = useState<{
@@ -260,9 +361,9 @@ export default function RegistroDooplexV2() {
     logs: []
   });
 
-  const { groups: parsedGroups, detectedServers, discardedCount } = useMemo(
-    () => parseEpisodesText(urls, skipDuplicates, excludedServers),
-    [urls, skipDuplicates, excludedServers]
+  const { groups: parsedGroups, detectedServers, detectedLangs, discardedCount } = useMemo(
+    () => parseEpisodesText(urls, skipDuplicates, excludedServers, excludedLangs),
+    [urls, skipDuplicates, excludedServers, excludedLangs]
   );
 
   const totalParsedLinks = useMemo(
@@ -638,6 +739,106 @@ export default function RegistroDooplexV2() {
                   </div>
                 </div>
               )}
+
+              {/* Excluded Languages Section */}
+              <div className="mt-5 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-red-600" />
+                    Idiomas Descartados
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleResetExcludedLangs}
+                    title="Restaurar idiomas (permitir todos)"
+                    className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Por defecto
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-500 mb-3">
+                  Haz clic en un idioma para descartarlo o activarlo, o agrégalo manualmente.
+                </p>
+
+                {/* Quick Toggle Buttons for Standard Languages */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {STANDARD_LANGS.map(({ code, label }) => {
+                    const isEx = isLanguageExcluded(code, code, excludedLangs);
+                    const isDetected = detectedLangs.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => handleToggleLang(code)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors flex items-center gap-1 ${
+                          isEx
+                            ? 'bg-red-50 text-red-700 border-red-200 line-through opacity-80 hover:bg-red-100'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {isEx ? <Ban className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                        {label}
+                        {isDetected && (
+                          <span className="ml-0.5 text-[10px] px-1 py-0.2 rounded bg-white/80 text-gray-700 font-semibold">
+                            detectado
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active Excluded Language Tags */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {excludedLangs.length === 0 && (
+                    <span className="text-xs text-gray-400 italic">No hay idiomas descartados</span>
+                  )}
+                  {excludedLangs.map((langItem) => (
+                    <span
+                      key={langItem}
+                      className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full text-xs font-medium"
+                    >
+                      {langItem}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExcludedLang(langItem)}
+                        className="hover:bg-red-200/60 rounded-full p-0.5 text-red-600"
+                        title={`Permitir ${langItem}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Add new language to discard */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newExcludedLangInput}
+                    onChange={(e) => setNewExcludedLangInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddExcludedLang();
+                      }
+                    }}
+                    placeholder="Agregar idioma a descartar (ej. CAST, LAT, SUB)..."
+                    className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-1.5 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddExcludedLang}
+                    disabled={!newExcludedLangInput.trim()}
+                    className="bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-1 text-xs font-medium"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Descartar
+                  </button>
+                </div>
+              </div>
 
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none">
