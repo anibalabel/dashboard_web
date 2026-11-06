@@ -1622,22 +1622,6 @@ export function integratedApiPlugin(): Plugin {
 
   return {
     name: 'integrated-dooplex-api',
-    async buildStart() {
-      try {
-        const { build } = await import('esbuild');
-        await build({
-          entryPoints: [path.resolve(process.cwd(), 'server', 'cloudflareWorker.ts')],
-          bundle: true,
-          format: 'esm',
-          target: 'es2022',
-          platform: 'browser',
-          external: ['cloudflare:sockets'],
-          outfile: path.resolve(process.cwd(), 'public', '_worker.js'),
-        });
-      } catch (err) {
-        console.warn('No se pudo regenerar public/_worker.js automáticamente:', err);
-      }
-    },
     configureServer(server) {
       attachMiddleware(server.middlewares);
     },
