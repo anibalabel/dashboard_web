@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PROXY_ENDPOINT } from '@/lib/proxy';
 
 const API_KEY = '103679m3ntc0haczdasdlg';
 const BASE_URL = 'https://api.byse.sx';
@@ -13,7 +14,7 @@ const fetchApi = async (endpoint: string) => {
     const err = error as { code?: string; response?: unknown };
     if (err.code === 'ERR_NETWORK' || !err.response) {
       console.warn('Direct fetch failed (CORS), falling back to proxy...');
-      const proxyUrl = `https://app.movflix.live/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+      const proxyUrl = `${PROXY_ENDPOINT}?url=${encodeURIComponent(targetUrl)}`;
       const proxyResponse = await axios.get(proxyUrl);
       return typeof proxyResponse.data === 'string' ? JSON.parse(proxyResponse.data) : proxyResponse.data;
     }

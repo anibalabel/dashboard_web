@@ -47,7 +47,7 @@ import {
   ApiResponse
 } from '../types';
 
-const BASE_URL = 'https://app.movflix.live';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const fetchDashboardStats = async (): Promise<DashboardResponse> => {
   try {

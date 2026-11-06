@@ -1,4 +1,4 @@
-export const PROXY_ENDPOINT = 'https://app.movflix.live/proxy.php';
+export const PROXY_ENDPOINT = import.meta.env.VITE_PROXY_URL || '/proxy.php';
 
 export function getProxyUrl(
   targetUrl: string,

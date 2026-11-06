@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { DEFAULT_VIDARA_API_KEY } from '@/lib/vidaraUtils';
+import { PROXY_ENDPOINT } from '@/lib/proxy';
 
 const BASE_URL = 'https://api.vidara.so/v1';
 
@@ -108,7 +109,7 @@ export interface VidaraUploadParams {
 
 const executeApi = async (endpoint: string): Promise<any> => {
   const targetUrl = `${BASE_URL}${endpoint}`;
-  const proxyUrl = `https://app.movflix.live/proxy.php?url=${encodeURIComponent(targetUrl)}`;
+  const proxyUrl = `${PROXY_ENDPOINT}?url=${encodeURIComponent(targetUrl)}`;
 
   try {
     const response = await axios.get(proxyUrl, { timeout: 35000 });
