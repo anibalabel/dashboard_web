@@ -1,23 +1,100 @@
-import { useState, FormEvent } from 'react';
+import { useState, useMemo, FormEvent } from 'react';
 import { Search, Loader2, PlayCircle, AlertCircle, Terminal, Copy, Check, CheckCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { formatDoodstreamUrl } from '@/lib/doodstreamUtils';
 import { getProxyUrl } from '@/lib/proxy';
 
+interface PlayLatinMovieSource {
+  id: string;
+  name: string;
+  url: string;
+  version?: string;
+  embed?: boolean;
+  kind?: string;
+  rank?: number;
+}
+
+interface PlayLatinMovieResponse {
+  ok?: boolean;
+  type?: string;
+  sources?: PlayLatinMovieSource[];
+}
+
 interface ScrapedResult {
   title?: string;
+  server?: string;
   lat?: string | null;
   cast?: string | null;
   sub?: string | null;
 }
 
+function normalizeLangVersion(version?: string, sourceId?: string): 'lat' | 'cast' | 'sub' | null {
+  const v = (version || '').trim().toLowerCase();
+  const id = (sourceId || '').trim().toLowerCase();
+  const combined = `${v} ${id}`;
+
+  if (combined.includes('latino') || combined.includes('lat')) return 'lat';
+  if (combined.includes('castellano') || combined.includes('cast') || combined.includes('españa') || combined.includes('espana')) return 'cast';
+  if (combined.includes('subtitulado') || combined.includes('sub') || combined.includes('vose') || combined.includes('ingles')) return 'sub';
+  return null;
+}
+
+function matchesPreferredServer(source: PlayLatinMovieSource, preferredServer: string): boolean {
+  if (!preferredServer || preferredServer === 'all') return true;
+  const pref = preferredServer.trim().toLowerCase();
+  const name = (source.name || '').toLowerCase();
+  const id = (source.id || '').toLowerCase();
+  const link = (source.url || '').toLowerCase();
+
+  if (pref === 'dropload' || pref === 'dr0pstream') {
+    return (
+      name.includes('dropload') ||
+      name.includes('dr0pstream') ||
+      name.includes('dropstream') ||
+      id.includes('dropload') ||
+      link.includes('dr0pstream') ||
+      link.includes('dropload')
+    );
+  }
+  if (pref === 'doodstream') {
+    return (
+      name.includes('dood') ||
+      id.includes('dood') ||
+      link.includes('dood') ||
+      link.includes('dsvplay')
+    );
+  }
+  if (pref === 'mixdrop') {
+    return (
+      name.includes('mixdrop') ||
+      name.includes('mxdrop') ||
+      id.includes('mixdrop') ||
+      link.includes('mixdrop') ||
+      link.includes('mxdrop')
+    );
+  }
+  if (pref === 'earnvids' || pref === 'smoothpre') {
+    return (
+      name.includes('earnvids') ||
+      name.includes('earnvid') ||
+      name.includes('smoothpre') ||
+      id.includes('earnvids') ||
+      link.includes('earnvids') ||
+      link.includes('smoothpre')
+    );
+  }
+
+  return name.includes(pref) || id.includes(pref) || link.includes(pref);
+}
+
 export default function ScraperMoviesCineHDPlus() {
   const [url, setUrl] = useState('');
-  const [preferredServer, setPreferredServer] = useState<string>('supervideo');
+  const [preferredServer, setPreferredServer] = useState<string>('dropload');
 
   const [isScraping, setIsScraping] = useState(false);
   const [logs, setLogs] = useState<{ msg: string; isError: boolean }[]>([]);
-  const [results, setResults] = useState<ScrapedResult[]>([]);
+  const [rawSources, setRawSources] = useState<PlayLatinMovieSource[]>([]);
+  const [movieTitle, setMovieTitle] = useState<string>('');
   const [notification, setNotification] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -27,153 +104,245 @@ export default function ScraperMoviesCineHDPlus() {
   };
 
   const addLog = (msg: string, isError = false) => {
-    setLogs(prev => [...prev, { msg, isError }]);
+    setLogs((prev) => [...prev, { msg, isError }]);
   };
 
   const fetchHTML = async (targetUrl: string, refererUrl?: string) => {
-    // Usar proxy
     const proxy = getProxyUrl(targetUrl, refererUrl ? { referer: refererUrl } : undefined);
-    try {
-      const res = await fetch(proxy);
-      if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy local`);
-      return await res.text();
-    } catch (error) {
-      console.error('Error en proxy local:', error);
-      throw error;
-    }
+    const res = await fetch(proxy);
+    if (!res.ok) throw new Error(`Error ${res.status} al conectar con proxy`);
+    return await res.text();
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const fetchPOST = async (targetUrl: string, body: URLSearchParams, refererUrl: string) => {
-    // Usar nuestro proxy PHP para peticiones POST complejas
-    const proxy = getProxyUrl(targetUrl, { referer: refererUrl });
-
-    try {
-      const res = await fetch(proxy, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: body.toString()
-      });
-      if (!res.ok) throw new Error(`Error ${res.status} al conectar con el proxy local`);
-      return await res.json();
-    } catch (error) {
-      console.error('Error en proxy local POST:', error);
-      throw error;
-    }
+  const fetchEmbedLinksJSON = async (
+    apiUrl: string,
+    payload: { type: string; id: string; token: string },
+    refererUrl: string
+  ): Promise<PlayLatinMovieResponse> => {
+    const proxy = getProxyUrl(apiUrl, { referer: refererUrl });
+    const res = await fetch(proxy, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`Error ${res.status} en petición POST a embed-links`);
+    return (await res.json()) as PlayLatinMovieResponse;
   };
+
+  const detectedServers = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of rawSources) {
+      if (s.name) set.add(s.name.trim());
+    }
+    return Array.from(set);
+  }, [rawSources]);
+
+  const results: ScrapedResult[] = useMemo(() => {
+    if (rawSources.length === 0) return [];
+
+    if (preferredServer === 'all') {
+      // Agrupar por servidor (name)
+      const byServer = new Map<string, ScrapedResult>();
+      for (const src of rawSources) {
+        if (!src.url) continue;
+        const srvName = (src.name || 'Servidor').trim();
+        const langKey = normalizeLangVersion(src.version, src.id);
+        if (!langKey) continue;
+
+        const cleanLink = formatDoodstreamUrl(
+          src.url.startsWith('//') ? `https:${src.url}` : src.url,
+          srvName
+        );
+
+        const existing = byServer.get(srvName) || {
+          title: movieTitle,
+          server: srvName,
+          lat: null,
+          cast: null,
+          sub: null
+        };
+
+        if (!existing[langKey]) {
+          existing[langKey] = cleanLink;
+        }
+        byServer.set(srvName, existing);
+      }
+      return Array.from(byServer.values()).filter((r) => Boolean(r.lat || r.cast || r.sub));
+    }
+
+    let latUrl: string | null = null;
+    let castUrl: string | null = null;
+    let subUrl: string | null = null;
+    let matchedServerLabel = preferredServer;
+
+    for (const src of rawSources) {
+      if (!src.url) continue;
+      if (!matchesPreferredServer(src, preferredServer)) continue;
+
+      const langKey = normalizeLangVersion(src.version, src.id);
+      if (!langKey) continue;
+
+      const cleanLink = formatDoodstreamUrl(
+        src.url.startsWith('//') ? `https:${src.url}` : src.url,
+        src.name || ''
+      );
+      if (src.name) matchedServerLabel = src.name;
+
+      if (langKey === 'lat' && !latUrl) latUrl = cleanLink;
+      if (langKey === 'cast' && !castUrl) castUrl = cleanLink;
+      if (langKey === 'sub' && !subUrl) subUrl = cleanLink;
+    }
+
+    if (!latUrl && !castUrl && !subUrl) return [];
+
+    return [
+      {
+        title: movieTitle,
+        server: matchedServerLabel,
+        lat: latUrl,
+        cast: castUrl,
+        sub: subUrl
+      }
+    ];
+  }, [rawSources, preferredServer, movieTitle]);
 
   const handleScrape = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!url) return;
+    if (!url.trim()) return;
 
     setIsScraping(true);
     setLogs([]);
-    setResults([]);
+    setRawSources([]);
+    setMovieTitle('');
 
     try {
-      // 1. Lectura de la URL principal
-      addLog(`Iniciando petición a: ${url}`);
-      const html = await fetchHTML(url);
-      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const targetUrl = url.trim();
+      let iframeSrc = '';
+      let extractedMovieId = '';
+      let extractedTitle = '';
 
-      // Extraer título de la película si está disponible
-      const titleElem = doc.querySelector('h1.entry-title') || doc.querySelector('.data h1') || doc.querySelector('h1') || doc.querySelector('meta[property="og:title"]');
-      const movieTitle = titleElem ? (titleElem.tagName === 'META' ? (titleElem as HTMLMetaElement).content : titleElem.textContent?.trim() || '') : '';
+      if (/playlatinsrc\.co\/(?:custom\/)?movie\//i.test(targetUrl)) {
+        iframeSrc = targetUrl;
+        const m = targetUrl.match(/playlatinsrc\.co\/(?:custom\/)?movie\/([a-zA-Z0-9_-]+)/i);
+        if (m?.[1]) extractedMovieId = m[1];
+        addLog(`URL directa de PlayLatinSRC detectada: ${iframeSrc}`);
+      } else {
+        // 1. Lectura de la URL principal de CineHDPlus
+        addLog(`Iniciando petición a: ${targetUrl}`);
+        const html = await fetchHTML(targetUrl);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
 
-      const finalResults: ScrapedResult[] = [];
+        const titleElem =
+          doc.querySelector('h1.entry-title') ||
+          doc.querySelector('.data h1') ||
+          doc.querySelector('h1[itemprop="name"]') ||
+          doc.querySelector('h1') ||
+          doc.querySelector('meta[property="og:title"]');
 
-      try {
-        // 2. Búsqueda del Iframe del Reproductor Principal
-        // Buscamos iframe con src que contenga verhdlink.cam/movie
-        const iframe = doc.querySelector('iframe[src*="verhdlink.cam/movie"]');
+        extractedTitle = titleElem
+          ? titleElem.tagName === 'META'
+            ? (titleElem as HTMLMetaElement).content
+            : titleElem.textContent?.trim() || ''
+          : '';
 
-        if (!iframe) {
-          addLog(`No se encontró el iframe de verhdlink.cam en la página`, true);
-          throw new Error('Iframe verhdlink no encontrado');
-        }
+        // 2. Búsqueda de <iframe id="movie_iframe" src="https://playlatinsrc.co/movie/tt...">
+        const movieIframe =
+          doc.querySelector('iframe#movie_iframe') ||
+          doc.querySelector('iframe[src*="playlatinsrc.co/movie/"]');
 
-        let iframeSrc = iframe.getAttribute('src') || '';
-        // Normalizar URL del iframe
-        if (iframeSrc.startsWith('//')) {
-          iframeSrc = 'https:' + iframeSrc;
-        } else if (!iframeSrc.startsWith('http')) {
-          iframeSrc = new URL(iframeSrc, url).href;
-        }
+        const rawIframeSrc = movieIframe?.getAttribute('src')?.trim() || '';
 
-        addLog(`Iframe encontrado: ${iframeSrc}`);
-        addLog(`Navegando al reproductor intermediario...`);
-
-        // 3. Navegación al Reproductor Intermediario
-        // Pasamos la URL original como referer para evitar 403 Forbidden
-        const playerHtml = await fetchHTML(iframeSrc, url);
-        const playerDoc = new DOMParser().parseFromString(playerHtml, 'text/html');
-
-        let latUrl: string | null = null;
-        let castUrl: string | null = null;
-        let subUrl: string | null = null;
-
-        // 4. Extracción de Enlaces por Idioma
-        // Buscamos listas <ul> con clases específicas para el idioma
-        // _player-mirrors + castellano / latino
-        const extractLinksFromContainer = (containerClass: string): string | null => {
-          const container = playerDoc.querySelector(`ul[class*="_player-mirrors"][class*="${containerClass}"]`) ||
-            playerDoc.querySelector(`ul.${containerClass}`);
-
-          if (!container) return null;
-
-          // Dentro de la lista, buscamos <li> con data-link
-          const items = Array.from(container.querySelectorAll('li[data-link]'));
-
-          for (const item of items) {
-            const serverName = (item.textContent || '').toLowerCase();
-            let link = item.getAttribute('data-link');
-
-            if (!link) continue;
-
-            // 5. Filtrado de Servidores
-            const isMatch = (() => {
-              if (preferredServer === 'dropload' || preferredServer === 'dr0pstream') {
-                return serverName.includes('dropload') || serverName.includes('dr0pstream') || serverName.includes('dropstream') || link.includes('dr0pstream') || link.includes('dropload');
-              }
-              if (preferredServer === 'earnvids' || preferredServer === 'smoothpre') {
-                return serverName.includes('earnvids') || serverName.includes('earnvid') || serverName.includes('smoothpre') || link.toLowerCase().includes('earnvids') || link.toLowerCase().includes('smoothpre');
-              }
-              return serverName.includes(preferredServer) || link.toLowerCase().includes(preferredServer);
-            })();
-
-            if (isMatch) {
-              if (link.startsWith('//')) {
-                link = 'https:' + link;
-              }
-              return formatDoodstreamUrl(link, serverName);
-            }
-          }
-
-          return null;
-        };
-
-        castUrl = formatDoodstreamUrl(extractLinksFromContainer('castellano'));
-        latUrl = formatDoodstreamUrl(extractLinksFromContainer('latino'));
-        // Intento extra para inglés/subtitulado si existiera esa convención
-        subUrl = formatDoodstreamUrl(extractLinksFromContainer('ingles') || extractLinksFromContainer('subtitulado'));
-
-        if (latUrl || castUrl || subUrl) {
-          finalResults.push({ title: movieTitle, lat: latUrl, cast: castUrl, sub: subUrl });
-          addLog(`Éxito - LAT: ${!!latUrl}, CAST: ${!!castUrl}, SUB: ${!!subUrl}`);
+        if (rawIframeSrc && rawIframeSrc.includes('playlatinsrc.co')) {
+          iframeSrc = rawIframeSrc.startsWith('//')
+            ? `https:${rawIframeSrc}`
+            : rawIframeSrc.startsWith('http')
+            ? rawIframeSrc
+            : new URL(rawIframeSrc, targetUrl).href;
         } else {
-          addLog(`No se encontraron enlaces válidos (${preferredServer}) en el reproductor`, true);
+          // En el HTML crudo, CineHDPlus asigna movie_iframe.src por script:
+          // var imdb = 'tt34385135'; iframe.src = 'https://playlatinsrc.co/movie/' + imdb;
+          const directPlayLatinMatch = html.match(/https?:\/\/playlatinsrc\.co\/movie\/([a-zA-Z0-9_-]+)/i);
+          const scriptImdbMatch = html.match(/var\s+imdb\s*=\s*['"]([a-zA-Z0-9_-]+)['"]/i);
+          const imdbLinkMatch = html.match(/imdb\.com\/title\/(tt\d+)/i);
+
+          if (directPlayLatinMatch?.[1] && directPlayLatinMatch[1] !== "'") {
+            extractedMovieId = directPlayLatinMatch[1];
+            iframeSrc = `https://playlatinsrc.co/movie/${extractedMovieId}`;
+          } else if (scriptImdbMatch?.[1]) {
+            extractedMovieId = scriptImdbMatch[1];
+            iframeSrc = `https://playlatinsrc.co/movie/${extractedMovieId}`;
+          } else if (imdbLinkMatch?.[1]) {
+            extractedMovieId = imdbLinkMatch[1];
+            iframeSrc = `https://playlatinsrc.co/movie/${extractedMovieId}`;
+          }
         }
 
-      } catch (err) {
-        addLog(`Error al procesar la película: ${err instanceof Error ? err.message : 'Error desconocido'}`, true);
+        if (!iframeSrc) {
+          addLog('No se encontró #movie_iframe ni el ID de PlayLatinSRC en la página.', true);
+          throw new Error('Iframe movie_iframe (playlatinsrc.co) no encontrado');
+        }
+
+        if (!extractedMovieId) {
+          const idFromSrc = iframeSrc.match(/playlatinsrc\.co\/(?:custom\/)?movie\/([a-zA-Z0-9_-]+)/i);
+          if (idFromSrc?.[1]) extractedMovieId = idFromSrc[1];
+        }
+
+        addLog(`Iframe detectado: ${iframeSrc}`);
       }
 
-      setResults(finalResults);
+      setMovieTitle(extractedTitle);
+
+      // 3. Obtener HTML de playlatinsrc.co/movie/{id} para extraer el token dinámico
+      addLog(`Obteniendo token desde: ${iframeSrc}`);
+      const playerHtml = await fetchHTML(iframeSrc, targetUrl);
+
+      const tokenMatch = playerHtml.match(/token\s*:\s*['"]([^'"]+)['"]/i);
+      const idInScriptMatch = playerHtml.match(/id\s*:\s*['"]([^'"]+)['"]/i);
+      const typeInScriptMatch = playerHtml.match(/type\s*:\s*['"]([^'"]+)['"]/i);
+
+      const finalId = idInScriptMatch?.[1] || extractedMovieId;
+      const finalType = typeInScriptMatch?.[1] || 'movie';
+      const finalToken = tokenMatch?.[1] || '';
+
+      if (!finalId || !finalToken) {
+        addLog('No se pudo extraer el token o ID desde el reproductor de PlayLatinSRC.', true);
+        throw new Error('Token de PlayLatinSRC no encontrado');
+      }
+
+      const embedOrigin = new URL(iframeSrc).origin;
+      const apiEndpoint = `${embedOrigin}/api/embed-links`;
+
+      addLog(`Enviando POST a ${apiEndpoint} (type: "${finalType}", id: "${finalId}")...`);
+
+      // 4. Petición POST a https://playlatinsrc.co/api/embed-links
+      const apiData = await fetchEmbedLinksJSON(
+        apiEndpoint,
+        {
+          type: finalType,
+          id: finalId,
+          token: finalToken
+        },
+        iframeSrc
+      );
+
+      if (!apiData || !apiData.ok || !Array.isArray(apiData.sources)) {
+        addLog('La respuesta de /api/embed-links no contiene fuentes válidas.', true);
+        throw new Error('Respuesta inválida de /api/embed-links');
+      }
+
+      const validSources = apiData.sources.filter((s) => Boolean(s && s.url));
+      setRawSources(validSources);
+
+      const serversSummary = Array.from(new Set(validSources.map((s) => `${s.name} (${s.version || 'N/A'})`))).join(', ');
+      addLog(`Se recibieron ${validSources.length} fuentes: ${serversSummary}`);
       addLog('Extracción finalizada exitosamente.');
     } catch (error) {
-      addLog(`Error crítico: ${error instanceof Error ? error.message : 'No se pudo completar la extracción'}`, true);
+      addLog(
+        `Error crítico: ${error instanceof Error ? error.message : 'No se pudo completar la extracción'}`,
+        true
+      );
     } finally {
       setIsScraping(false);
     }
@@ -186,7 +355,7 @@ export default function ScraperMoviesCineHDPlus() {
       setCopiedKey(key);
       showNotification(successMsg || 'URL copiada al portapapeles');
       setTimeout(() => {
-        setCopiedKey(prev => (prev === key ? null : prev));
+        setCopiedKey((prev) => (prev === key ? null : prev));
       }, 2000);
     } else {
       showNotification('Error al copiar al portapapeles');
@@ -199,13 +368,13 @@ export default function ScraperMoviesCineHDPlus() {
 
     if (type === 'all') {
       links = results
-        .flatMap(r => [r.lat, r.cast, r.sub])
+        .flatMap((r) => [r.lat, r.cast, r.sub])
         .filter((l): l is string => Boolean(l && l.trim()))
         .join('\n');
       label = 'todos los enlaces';
     } else {
       links = results
-        .map(r => r[type])
+        .map((r) => r[type])
         .filter((l): l is string => Boolean(l && l.trim()))
         .join('\n');
       label = `enlaces ${type.toUpperCase()}`;
@@ -241,13 +410,13 @@ export default function ScraperMoviesCineHDPlus() {
             <form onSubmit={handleScrape} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  URL de la Película (CineHDPlus)
+                  URL de la Película (CineHDPlus o PlayLatinSRC)
                 </label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://cinehdplus.gratis/peliculas/..."
+                  placeholder="https://cinehdplus.work/peliculas/25667-colony-ver-online-hd.html"
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2"
                   required
                 />
@@ -262,15 +431,27 @@ export default function ScraperMoviesCineHDPlus() {
                   onChange={(e) => setPreferredServer(e.target.value)}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 border p-2"
                 >
+                  <option value="dropload">DropLoad (dropload.io / dr0pstream.com)</option>
+                  <option value="doodstream">Doodstream (doodstream.com)</option>
+                  <option value="mixdrop">MixDrop (mixdrop.ag / mxdrop.to)</option>
+                  <option value="all">Todos los servidores</option>
                   <option value="supervideo">Supervideo</option>
-                  <option value="doodstream">Doodstream (dood.to)</option>
-                  <option value="mixdrop">MixDrop (mixdrop.ps)</option>
-                  <option value="dropload">DropLoad (dr0pstream.com)</option>
                   <option value="streamwish">StreamWish</option>
                   <option value="voe">VOE</option>
                   <option value="earnvids">EarnVids</option>
                   <option value="streamtape">Streamtape</option>
                   <option value="uqload">Uqload</option>
+                  {detectedServers.map((srv) => {
+                    const low = srv.toLowerCase();
+                    if (low.includes('dropload') || low.includes('dood') || low.includes('mixdrop')) {
+                      return null;
+                    }
+                    return (
+                      <option key={srv} value={srv}>
+                        {srv} (Detectado)
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -434,8 +615,13 @@ export default function ScraperMoviesCineHDPlus() {
                 {results.map((res, idx) => (
                   <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm">
                     <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-3">
-                      <h3 className="font-bold text-gray-800 text-base flex items-center gap-2">
+                      <h3 className="font-bold text-gray-800 text-base flex flex-wrap items-center gap-2">
                         <span>🎬 Enlaces de la Película</span>
+                        {res.server && (
+                          <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                            {res.server}
+                          </span>
+                        )}
                         {res.title && (
                           <span className="text-sm font-normal text-gray-600 truncate max-w-xs">({res.title})</span>
                         )}
@@ -451,7 +637,7 @@ export default function ScraperMoviesCineHDPlus() {
                             ? 'bg-emerald-100 text-emerald-800 font-medium'
                             : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                         }`}
-                        title="Copiar todos los enlaces de esta película"
+                        title="Copiar todos los enlaces de esta tarjeta"
                       >
                         {copiedKey === `card-${idx}` ? (
                           <>
@@ -470,7 +656,9 @@ export default function ScraperMoviesCineHDPlus() {
                     <div className="space-y-2">
                       {res.lat && (
                         <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-blue-300 transition-colors">
-                          <span className="font-semibold text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded w-14 text-center shrink-0">LAT</span>
+                          <span className="font-semibold text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded w-14 text-center shrink-0">
+                            LAT
+                          </span>
                           <a
                             href={res.lat}
                             target="_blank"
@@ -501,7 +689,9 @@ export default function ScraperMoviesCineHDPlus() {
 
                       {res.cast && (
                         <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-red-300 transition-colors">
-                          <span className="font-semibold text-xs text-red-800 bg-red-100 px-2 py-1 rounded w-14 text-center shrink-0">CAST</span>
+                          <span className="font-semibold text-xs text-red-800 bg-red-100 px-2 py-1 rounded w-14 text-center shrink-0">
+                            CAST
+                          </span>
                           <a
                             href={res.cast}
                             target="_blank"
@@ -532,7 +722,9 @@ export default function ScraperMoviesCineHDPlus() {
 
                       {res.sub && (
                         <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-gray-200 hover:border-green-300 transition-colors">
-                          <span className="font-semibold text-xs text-green-800 bg-green-100 px-2 py-1 rounded w-14 text-center shrink-0">SUB</span>
+                          <span className="font-semibold text-xs text-green-800 bg-green-100 px-2 py-1 rounded w-14 text-center shrink-0">
+                            SUB
+                          </span>
                           <a
                             href={res.sub}
                             target="_blank"
