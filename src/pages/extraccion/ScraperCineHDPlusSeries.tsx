@@ -166,12 +166,17 @@ export default function ScraperCineHDPlusSeries() {
     refererUrl: string
   ): Promise<PlayLatinTvResponse> => {
     const proxy = getProxyUrl(apiUrl, { referer: refererUrl });
+    const body = new URLSearchParams({
+      type: payload.type,
+      id: payload.id,
+      token: payload.token
+    });
     const res = await fetch(proxy, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: JSON.stringify(payload)
+      body: body.toString()
     });
     if (!res.ok) throw new Error(`Error ${res.status} en petición POST a embed-links`);
     return (await res.json()) as PlayLatinTvResponse;
