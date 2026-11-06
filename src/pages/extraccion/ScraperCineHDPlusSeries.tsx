@@ -166,17 +166,16 @@ export default function ScraperCineHDPlusSeries() {
     refererUrl: string
   ): Promise<PlayLatinTvResponse> => {
     const proxy = getProxyUrl(apiUrl, { referer: refererUrl });
-    const body = new URLSearchParams({
-      type: payload.type,
-      id: payload.id,
-      token: payload.token
-    });
     const res = await fetch(proxy, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json'
       },
-      body: body.toString()
+      body: JSON.stringify({
+        type: payload.type,
+        id: payload.id,
+        token: payload.token
+      })
     });
     if (!res.ok) throw new Error(`Error ${res.status} en petición POST a embed-links`);
     return (await res.json()) as PlayLatinTvResponse;
@@ -411,13 +410,22 @@ export default function ScraperCineHDPlusSeries() {
       const playerHtml = await fetchHTML(iframeSrc, targetUrl);
 
       const payloadMatch = playerHtml.match(
-        /\{\s*type\s*:\s*['"](tv|movie)['"]\s*,\s*id\s*:\s*['"]([^'"]+)['"]\s*,\s*token\s*:\s*['"]([^'"]+)['"]\s*\}/i
+        /\{\s*type\s*:\s*['"]tv['"]\s*,\s*id\s*:\s*['"]([^'"]+)['"]\s*,\s*token\s*:\s*['"]([^'"]+)['"]\s*\}/i
       );
       const tokenMatch = playerHtml.match(/token\s*:\s*['"]([^'"]+)['"]/i);
 
-      const finalType = payloadMatch?.[1] || 'tv';
-      const finalId = payloadMatch?.[2] || extractedSeriesId;
-      const finalToken = payloadMatch?.[3] || tokenMatch?.[1] || '';
+      const finalType = 'tv';
+      const finalToken = payloadMatch?.[2] || tokenMatch?.[1] || '';
+      let tokenDecodedId = '';
+      if (finalToken.includes('.')) {
+        try {
+          const parts = atob(finalToken.split('.')[0]).split('|');
+          if (parts[1]) tokenDecodedId = parts[1];
+        } catch {
+          // ignore
+        }
+      }
+      const finalId = payloadMatch?.[1] || tokenDecodedId || extractedSeriesId;
 
       if (!finalId || !finalToken) {
         addLog('No se pudo extraer el token o ID desde el reproductor de PlayLatinSRC.', true);

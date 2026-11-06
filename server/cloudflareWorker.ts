@@ -327,8 +327,8 @@ async function withMysql<T>(
     const p = greeting.payload;
     let pos = 1;
     while (p[pos] !== 0) pos++;
-    pos++; // skip null byte
-    pos += 4; // thread id
+    pos++;
+    pos += 4;
     const auth1 = p.slice(pos, pos + 8);
     pos += 8 + 1 + 2 + 1 + 2 + 2;
     const authLen = p[pos];
@@ -348,8 +348,8 @@ async function withMysql<T>(
     header[1] = (clientFlags >> 8) & 0xff;
     header[2] = (clientFlags >> 16) & 0xff;
     header[3] = (clientFlags >> 24) & 0xff;
-    header[7] = 0x01; // 16MB max packet
-    header[8] = 45; // utf8mb4_general_ci
+    header[7] = 0x01;
+    header[8] = 45;
 
     const body = concatBytes(header, userBytes, new Uint8Array([authResp.length]), authResp, dbBytes, pluginBytes);
     await writePacket(greeting.seq + 1, body);
@@ -364,7 +364,7 @@ async function withMysql<T>(
       const finalSql = params.length > 0 ? formatSql(sql, params) : sql;
       const sqlBytes = new TextEncoder().encode(finalSql);
       const cmd = new Uint8Array(1 + sqlBytes.length);
-      cmd[0] = 0x03; // COM_QUERY
+      cmd[0] = 0x03;
       cmd.set(sqlBytes, 1);
       await writePacket(0, cmd);
 
@@ -392,13 +392,13 @@ async function withMysql<T>(
         const colPkt = await readPacket();
         const cp = colPkt.payload;
         let o = 0;
-        o = readLenEncString(cp, o).nextOffset; // catalog
-        o = readLenEncString(cp, o).nextOffset; // schema
-        o = readLenEncString(cp, o).nextOffset; // table
-        o = readLenEncString(cp, o).nextOffset; // org_table
-        const nameRes = readLenEncString(cp, o); // name
+        o = readLenEncString(cp, o).nextOffset;
+        o = readLenEncString(cp, o).nextOffset;
+        o = readLenEncString(cp, o).nextOffset;
+        o = readLenEncString(cp, o).nextOffset;
+        const nameRes = readLenEncString(cp, o);
         o = nameRes.nextOffset;
-        o = readLenEncString(cp, o).nextOffset; // org_name
+        o = readLenEncString(cp, o).nextOffset;
         const colType = cp[o + 7];
         columns.push({
           name: nameRes.value ?? `col_${i}`,
@@ -441,26 +441,17 @@ async function withMysql<T>(
     return await fn(query);
   } finally {
     try {
-      // Send COM_QUIT (0x01) gracefully
       await writePacket(0, new Uint8Array([0x01]));
-    } catch {
-      // ignore
-    }
+    } catch {}
     try {
       writer.releaseLock();
-    } catch {
-      // ignore
-    }
+    } catch {}
     try {
       reader.releaseLock();
-    } catch {
-      // ignore
-    }
+    } catch {}
     try {
       sock.close();
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 }
 
@@ -491,9 +482,7 @@ async function parseRequestBody(request: Request): Promise<Record<string, any>> 
     try {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') return parsed;
-    } catch {
-      // fallback to URLSearchParams
-    }
+    } catch {}
     const params = new URLSearchParams(raw);
     const out: Record<string, any> = {};
     for (const [k, v] of params.entries()) {
@@ -514,10 +503,13 @@ function generateStreamKey(length = 12): string {
   return key;
 }
 
-// ============================================================================
-// Route Handlers
-// ============================================================================
+function nowDatetime(): string {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
 
+// ============================================================================
+// 1. /login_dooplex.php
+// ============================================================================
 async function handleLoginDooplex(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return jsonResponse(405, { success: false, error: 'Método no permitido' });
@@ -564,6 +556,9 @@ async function handleLoginDooplex(request: Request): Promise<Response> {
   }
 }
 
+// ============================================================================
+// 2. /dashboard.php
+// ============================================================================
 async function handleDashboard(request: Request): Promise<Response> {
   if (request.method !== 'GET') {
     return jsonResponse(405, { success: false, error: 'Método no permitido' });
@@ -594,6 +589,9 @@ async function handleDashboard(request: Request): Promise<Response> {
   }
 }
 
+// ============================================================================
+// 3. /movie_dooplex.php (con soporte completo de header, embed, youtubelink, hls, supported_hosts)
+// ============================================================================
 async function handleMovieDooplex(request: Request, searchParams: URLSearchParams): Promise<Response> {
   const method = request.method;
 
@@ -604,77 +602,16 @@ async function handleMovieDooplex(request: Request, searchParams: URLSearchParam
         const movieId = searchParams.get('movie_id');
 
         if (tmdbId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, title, poster_path, backdrop_path FROM movies WHERE tmdb_id = ?',
-            [tmdbId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, title FROM movies WHERE tmdb_id = ?', [tmdbId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (movieId) {
           const { rows } = await query(
-            'SELECT id, movie_id, server, link, lang, hd, status FROM movie_videos WHERE movie_id = ?',
+            'SELECT id, server, header, link, lang, embed, youtubelink, hls, supported_hosts FROM movie_videos WHERE movie_id = ?',
             [movieId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { success: true, data: rows });
         }
-        return jsonResponse(400, { success: false, error: 'Parámetro requerido: tmdb_id o movie_id' });
-      }
-
-      const updateMovieVideo = async (input: Record<string, any>) => {
-        if (input.id === undefined) {
-          return jsonResponse(400, { success: false, error: 'Se requiere el parámetro id para actualizar' });
-        }
-        const fields: string[] = [];
-        const values: any[] = [];
-        for (const k of ['server', 'link', 'lang', 'hd', 'status']) {
-          if (input[k] !== undefined) {
-            fields.push(`${k} = ?`);
-            values.push(input[k]);
-          }
-        }
-        if (fields.length === 0) {
-          return jsonResponse(400, {
-            success: false,
-            error: 'No se proporcionaron campos para actualizar (server, link, lang, hd, status)',
-          });
-        }
-        fields.push('updated_at = NOW()');
-        values.push(input.id);
-        await query(`UPDATE movie_videos SET ${fields.join(', ')} WHERE id = ?`, values);
-        return jsonResponse(200, { success: true, message: 'Video actualizado correctamente en Dooplex' });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.id !== undefined) {
-          return await updateMovieVideo(input);
-        }
-        if (
-          input.movie_id === undefined ||
-          input.server === undefined ||
-          input.link === undefined ||
-          input.lang === undefined
-        ) {
-          return jsonResponse(400, {
-            success: false,
-            error: 'Faltan parámetros requeridos (movie_id, server, link, lang)',
-          });
-        }
-        const hd = input.hd !== undefined ? input.hd : 1;
-        const status = input.status !== undefined ? input.status : 1;
-        const res = await query(
-          'INSERT INTO movie_videos (movie_id, server, link, lang, hd, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-          [input.movie_id, input.server, input.link, input.lang, hd, status]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Video de película insertado correctamente en Dooplex',
-          id: String(res.insertId),
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateMovieVideo(input);
+        return jsonResponse(400, { error: 'Faltan parámetros (tmdb_id o movie_id)' });
       }
 
       if (method === 'DELETE') {
@@ -684,22 +621,120 @@ async function handleMovieDooplex(request: Request, searchParams: URLSearchParam
           if (input.id !== undefined) id = String(input.id);
         }
         if (!id) {
-          return jsonResponse(400, { success: false, error: 'Se requiere el parámetro id para eliminar' });
+          return jsonResponse(400, { error: 'Falta el parámetro id para eliminar' });
         }
-        const res = await query('DELETE FROM movie_videos WHERE id = ?', [id]);
-        if (res.affectedRows > 0) {
-          return jsonResponse(200, { success: true, message: 'Video eliminado correctamente de Dooplex' });
-        }
-        return jsonResponse(404, { success: false, error: 'No se encontró el video con el id proporcionado' });
+        await query('DELETE FROM movie_videos WHERE id = ?', [id]);
+        return jsonResponse(200, { success: true, message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const id = input.id ?? null;
+        const currentTime = nowDatetime();
+
+        if (method === 'PUT' || id !== null) {
+          if (!id) {
+            return jsonResponse(400, { error: 'Falta el parámetro id para actualizar' });
+          }
+
+          const updateFields: string[] = [];
+          const values: any[] = [];
+
+          if (input.server !== undefined && String(input.server).trim() !== '') {
+            updateFields.push('server = ?');
+            values.push(String(input.server).trim());
+          }
+          if (input.header !== undefined && String(input.header).trim() !== '') {
+            updateFields.push('header = ?');
+            values.push(String(input.header).trim());
+          }
+          if (input.link !== undefined && String(input.link).trim() !== '') {
+            updateFields.push('`link` = ?');
+            values.push(String(input.link).trim());
+          }
+          if (input.lang !== undefined && String(input.lang).trim() !== '') {
+            updateFields.push('lang = ?');
+            values.push(String(input.lang).trim());
+          }
+          if ('embed' in input) {
+            updateFields.push('embed = ?');
+            values.push(typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : input.embed);
+          }
+          if ('youtubelink' in input) {
+            updateFields.push('youtubelink = ?');
+            values.push(input.youtubelink);
+          }
+          if ('hls' in input) {
+            updateFields.push('hls = ?');
+            values.push(typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : input.hls);
+          }
+          if ('supported_hosts' in input) {
+            updateFields.push('supported_hosts = ?');
+            values.push(
+              Array.isArray(input.supported_hosts) ? JSON.stringify(input.supported_hosts) : input.supported_hosts
+            );
+          }
+
+          if (updateFields.length === 0) {
+            return jsonResponse(200, {
+              message: 'No se enviaron datos válidos para actualizar o no hubieron cambios',
+            });
+          }
+
+          updateFields.push('updated_at = ?');
+          values.push(currentTime);
+          values.push(id);
+
+          await query(`UPDATE movie_videos SET ${updateFields.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, {
+            success: true,
+            message: 'Actualizado correctamente',
+            updated_at: currentTime,
+          });
+        } else {
+          const movieId = input.movie_id ?? null;
+          if (!movieId) {
+            return jsonResponse(400, { error: 'Falta el parámetro movie_id para el registro' });
+          }
+
+          const server = input.server ?? null;
+          const header = input.header ?? null;
+          const link = input.link ?? null;
+          const lang = input.lang ?? null;
+          const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
+          const youtubelink = input.youtubelink ?? null;
+          const hls = typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : (input.hls ?? null);
+          const supportedHosts = Array.isArray(input.supported_hosts)
+            ? JSON.stringify(input.supported_hosts)
+            : (input.supported_hosts ?? null);
+
+          const res = await query(
+            'INSERT INTO movie_videos (movie_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [movieId, server, header, link, lang, embed, youtubelink, hls, supportedHosts, currentTime, currentTime]
+          );
+
+          return jsonResponse(200, {
+            success: true,
+            message: 'Registrado correctamente',
+            data: {
+              id: String(res.insertId),
+              created_at: currentTime,
+              updated_at: currentTime,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en movie_dooplex: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en movie_dooplex: ' + (err?.message || String(err)) });
   }
 }
 
+// ============================================================================
+// 4. /series_dooplex.php (con soporte completo de header, embed, youtubelink, hls, supported_hosts)
+// ============================================================================
 async function handleSeriesDooplex(request: Request, searchParams: URLSearchParams): Promise<Response> {
   const method = request.method;
 
@@ -712,116 +747,24 @@ async function handleSeriesDooplex(request: Request, searchParams: URLSearchPara
         const episodeId = searchParams.get('episode_id');
 
         if (tmdbId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, name, poster_path, backdrop_path, newEpisodes FROM series WHERE tmdb_id = ?',
-            [tmdbId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, name FROM series WHERE tmdb_id = ?', [tmdbId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (serieId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, serie_id, name, season_number FROM seasons WHERE serie_id = ? ORDER BY season_number ASC',
-            [serieId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, season_number, name FROM seasons WHERE serie_id = ?', [serieId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (seasonId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, season_id, name, episode_number, still_path FROM episodes WHERE season_id = ? ORDER BY episode_number ASC',
-            [seasonId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, episode_number, name FROM episodes WHERE season_id = ?', [seasonId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (episodeId) {
           const { rows } = await query(
-            'SELECT id, episode_id, server, link, lang, hd FROM serie_videos WHERE episode_id = ?',
+            'SELECT id, server, header, link, lang, embed, youtubelink, hls, supported_hosts FROM serie_videos WHERE episode_id = ?',
             [episodeId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { success: true, data: rows });
         }
         return jsonResponse(400, {
-          success: false,
-          error: 'Parámetro requerido: tmdb_id, serie_id, season_id o episode_id',
+          error: 'Faltan parámetros (tmdb_id, serie_id, season_id o episode_id)',
         });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        if (input.episodes_id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of ['name', 'overview', 'still_path']) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, {
-              success: false,
-              error: 'No se proporcionaron campos para actualizar en episodes (name, overview, still_path)',
-            });
-          }
-          fields.push('updated_at = NOW()');
-          values.push(input.episodes_id);
-          await query(`UPDATE episodes SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Episodio actualizado correctamente en Dooplex' });
-        }
-
-        if (input.id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of ['server', 'link', 'lang', 'hd']) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, {
-              success: false,
-              error: 'No se proporcionaron campos para actualizar en serie_videos (server, link, lang, hd)',
-            });
-          }
-          fields.push('updated_at = NOW()');
-          values.push(input.id);
-          await query(`UPDATE serie_videos SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Video actualizado correctamente en Dooplex' });
-        }
-
-        return jsonResponse(400, {
-          success: false,
-          error: 'Se requiere episodes_id o id para actualizar',
-        });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.episodes_id !== undefined || input.id !== undefined) {
-          return await updateRecord(input);
-        }
-        if (
-          input.episode_id === undefined ||
-          input.server === undefined ||
-          input.link === undefined ||
-          input.lang === undefined ||
-          input.hd === undefined
-        ) {
-          return jsonResponse(400, {
-            success: false,
-            error: 'Faltan parámetros requeridos (episode_id, server, link, lang, hd)',
-          });
-        }
-        const res = await query(
-          'INSERT INTO serie_videos (episode_id, server, link, lang, hd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
-          [input.episode_id, input.server, input.link, input.lang, input.hd]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Video insertado correctamente en Dooplex',
-          id: String(res.insertId),
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
       }
 
       if (method === 'DELETE') {
@@ -831,22 +774,143 @@ async function handleSeriesDooplex(request: Request, searchParams: URLSearchPara
           if (input.id !== undefined) id = String(input.id);
         }
         if (!id) {
-          return jsonResponse(400, { success: false, error: 'Se requiere el parámetro id para eliminar' });
+          return jsonResponse(400, { error: 'Falta el parámetro id para eliminar' });
         }
-        const res = await query('DELETE FROM serie_videos WHERE id = ?', [id]);
-        if (res.affectedRows > 0) {
-          return jsonResponse(200, { success: true, message: 'Video eliminado correctamente de Dooplex' });
-        }
-        return jsonResponse(404, { success: false, error: 'No se encontró el video con el id proporcionado' });
+        await query('DELETE FROM serie_videos WHERE id = ?', [id]);
+        return jsonResponse(200, { success: true, message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const id = input.id ?? null;
+        const episodesId = input.episodes_id ?? null;
+        const currentTime = nowDatetime();
+
+        if (episodesId !== null) {
+          if (!episodesId) {
+            return jsonResponse(400, { error: 'Falta el parámetro episodes_id para actualizar' });
+          }
+
+          const updateFields: string[] = [];
+          const values: any[] = [];
+
+          for (const k of ['name', 'overview', 'still_path', 'still_path_tv']) {
+            if (input[k] !== undefined && input[k] !== null && String(input[k]).trim() !== '') {
+              updateFields.push(`${k} = ?`);
+              values.push(input[k]);
+            }
+          }
+
+          if (updateFields.length === 0) {
+            return jsonResponse(200, { message: 'No hay datos válidos para actualizar' });
+          }
+
+          values.push(episodesId);
+          await query(`UPDATE episodes SET ${updateFields.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, { success: true, message: 'Actualizado correctamente' });
+        } else if (method === 'PUT' || id !== null) {
+          if (!id) {
+            return jsonResponse(400, { error: 'Falta el parámetro id para actualizar' });
+          }
+
+          const updateFields: string[] = [];
+          const values: any[] = [];
+
+          if (input.server !== undefined && String(input.server).trim() !== '') {
+            updateFields.push('server = ?');
+            values.push(String(input.server).trim());
+          }
+          if (input.header !== undefined && String(input.header).trim() !== '') {
+            updateFields.push('header = ?');
+            values.push(String(input.header).trim());
+          }
+          if (input.link !== undefined && String(input.link).trim() !== '') {
+            updateFields.push('`link` = ?');
+            values.push(String(input.link).trim());
+          }
+          if (input.lang !== undefined && String(input.lang).trim() !== '') {
+            updateFields.push('lang = ?');
+            values.push(String(input.lang).trim());
+          }
+          if ('embed' in input) {
+            updateFields.push('embed = ?');
+            values.push(typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : input.embed);
+          }
+          if ('youtubelink' in input) {
+            updateFields.push('youtubelink = ?');
+            values.push(input.youtubelink);
+          }
+          if ('hls' in input) {
+            updateFields.push('hls = ?');
+            values.push(typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : input.hls);
+          }
+          if ('supported_hosts' in input) {
+            updateFields.push('supported_hosts = ?');
+            values.push(
+              Array.isArray(input.supported_hosts) ? JSON.stringify(input.supported_hosts) : input.supported_hosts
+            );
+          }
+
+          if (updateFields.length === 0) {
+            return jsonResponse(200, {
+              message: 'No se enviaron datos válidos para actualizar o no hubieron cambios',
+            });
+          }
+
+          updateFields.push('updated_at = ?');
+          values.push(currentTime);
+          values.push(id);
+
+          await query(`UPDATE serie_videos SET ${updateFields.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, {
+            success: true,
+            message: 'Actualizado correctamente',
+            updated_at: currentTime,
+          });
+        } else {
+          const episodeId = input.episode_id ?? null;
+          if (!episodeId) {
+            return jsonResponse(400, { error: 'Falta el parámetro episode_id para el registro' });
+          }
+
+          const server = input.server ?? null;
+          const header = input.header ?? null;
+          const link = input.link ?? null;
+          const lang = input.lang ?? null;
+          const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
+          const youtubelink = input.youtubelink ?? null;
+          const hls = typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : (input.hls ?? null);
+          const supportedHosts = Array.isArray(input.supported_hosts)
+            ? JSON.stringify(input.supported_hosts)
+            : (input.supported_hosts ?? null);
+
+          const res = await query(
+            'INSERT INTO serie_videos (episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [episodeId, server, header, link, lang, embed, youtubelink, hls, supportedHosts, currentTime, currentTime]
+          );
+
+          return jsonResponse(200, {
+            success: true,
+            message: 'Registrado correctamente',
+            data: {
+              id: String(res.insertId),
+              created_at: currentTime,
+              updated_at: currentTime,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en series_dooplex: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en series_dooplex: ' + (err?.message || String(err)) });
   }
 }
 
+// ============================================================================
+// 5. /anime_dooplex.php (con soporte completo de header, embed, youtubelink, hls, supported_hosts)
+// ============================================================================
 async function handleAnimeDooplex(request: Request, searchParams: URLSearchParams): Promise<Response> {
   const method = request.method;
 
@@ -859,119 +923,27 @@ async function handleAnimeDooplex(request: Request, searchParams: URLSearchParam
         const animeEpisodeId = searchParams.get('anime_episode_id');
 
         if (tmdbId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, name, poster_path, backdrop_path, newEpisodes FROM animes WHERE tmdb_id = ?',
-            [tmdbId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, name FROM animes WHERE tmdb_id = ?', [tmdbId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (animeId) {
-          const { rows } = await query(
-            'SELECT id, tmdb_id, anime_id, name, season_number FROM anime_seasons WHERE anime_id = ? ORDER BY season_number ASC',
-            [animeId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT * FROM anime_seasons WHERE anime_id = ?', [animeId]);
+          return jsonResponse(200, { success: true, data: rows });
         } else if (animeSeasonId) {
           const { rows } = await query(
-            'SELECT id, tmdb_id, anime_season_id, name, episode_number, still_path FROM anime_episodes WHERE anime_season_id = ? ORDER BY episode_number ASC',
+            'SELECT id, episode_number, name FROM anime_episodes WHERE anime_season_id = ?',
             [animeSeasonId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { success: true, data: rows });
         } else if (animeEpisodeId) {
           const { rows } = await query(
-            'SELECT id, anime_episode_id, server, link, lang, hd FROM anime_videos WHERE anime_episode_id = ?',
+            'SELECT id, anime_episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts FROM anime_videos WHERE anime_episode_id = ?',
             [animeEpisodeId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { success: true, data: rows });
         }
         return jsonResponse(400, {
-          success: false,
-          error: 'Parámetro requerido: tmdb_id, anime_id, anime_season_id o anime_episode_id',
+          error: 'Faltan parámetros (tmdb_id, anime_id, anime_season_id o anime_episode_id)',
         });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        if (input.anime_episodes_id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of ['name', 'overview', 'still_path']) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, {
-              success: false,
-              error: 'No se proporcionaron campos para actualizar en anime_episodes (name, overview, still_path)',
-            });
-          }
-          fields.push('updated_at = NOW()');
-          values.push(input.anime_episodes_id);
-          await query(`UPDATE anime_episodes SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, {
-            success: true,
-            message: 'Episodio de anime actualizado correctamente en Dooplex',
-          });
-        }
-
-        if (input.id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of ['server', 'link', 'lang', 'hd']) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, {
-              success: false,
-              error: 'No se proporcionaron campos para actualizar en anime_videos (server, link, lang, hd)',
-            });
-          }
-          fields.push('updated_at = NOW()');
-          values.push(input.id);
-          await query(`UPDATE anime_videos SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Video de anime actualizado correctamente en Dooplex' });
-        }
-
-        return jsonResponse(400, {
-          success: false,
-          error: 'Se requiere anime_episodes_id o id para actualizar',
-        });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.anime_episodes_id !== undefined || input.id !== undefined) {
-          return await updateRecord(input);
-        }
-        if (
-          input.anime_episode_id === undefined ||
-          input.server === undefined ||
-          input.link === undefined ||
-          input.lang === undefined ||
-          input.hd === undefined
-        ) {
-          return jsonResponse(400, {
-            success: false,
-            error: 'Faltan parámetros requeridos (anime_episode_id, server, link, lang, hd)',
-          });
-        }
-        const res = await query(
-          'INSERT INTO anime_videos (anime_episode_id, server, link, lang, hd, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
-          [input.anime_episode_id, input.server, input.link, input.lang, input.hd]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Video insertado correctamente en Anime Dooplex',
-          id: String(res.insertId),
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
       }
 
       if (method === 'DELETE') {
@@ -981,22 +953,159 @@ async function handleAnimeDooplex(request: Request, searchParams: URLSearchParam
           if (input.id !== undefined) id = String(input.id);
         }
         if (!id) {
-          return jsonResponse(400, { success: false, error: 'Se requiere el parámetro id para eliminar' });
+          return jsonResponse(400, { error: 'Falta el parámetro id para eliminar' });
         }
-        const res = await query('DELETE FROM anime_videos WHERE id = ?', [id]);
-        if (res.affectedRows > 0) {
-          return jsonResponse(200, { success: true, message: 'Video eliminado correctamente de Anime Dooplex' });
-        }
-        return jsonResponse(404, { success: false, error: 'No se encontró el video con el id proporcionado' });
+        await query('DELETE FROM anime_videos WHERE id = ?', [id]);
+        return jsonResponse(200, { success: true, message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const id = input.id ?? null;
+        const animeEpisodesId = input.anime_episodes_id ?? null;
+        const currentTime = nowDatetime();
+
+        if (animeEpisodesId !== null) {
+          if (!animeEpisodesId) {
+            return jsonResponse(400, { error: 'Falta el parámetro anime_episodes_id para actualizar' });
+          }
+
+          const updateFields: string[] = [];
+          const values: any[] = [];
+
+          for (const k of ['name', 'overview', 'still_path', 'still_path_tv']) {
+            if (input[k] !== undefined && input[k] !== null && String(input[k]).trim() !== '') {
+              updateFields.push(`${k} = ?`);
+              values.push(input[k]);
+            }
+          }
+
+          if (updateFields.length === 0) {
+            return jsonResponse(200, { message: 'No hay datos válidos para actualizar' });
+          }
+
+          values.push(animeEpisodesId);
+          await query(`UPDATE anime_episodes SET ${updateFields.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, { success: true, message: 'Actualizado correctamente' });
+        } else if (method === 'PUT' || id !== null) {
+          if (!id) {
+            return jsonResponse(400, { error: 'Falta el parámetro id para actualizar' });
+          }
+
+          const updateFields: string[] = [];
+          const values: any[] = [];
+
+          if (input.anime_episode_id !== undefined && String(input.anime_episode_id).trim() !== '') {
+            updateFields.push('anime_episode_id = ?');
+            values.push(input.anime_episode_id);
+          }
+          if (input.server !== undefined && String(input.server).trim() !== '') {
+            updateFields.push('server = ?');
+            values.push(String(input.server).trim());
+          }
+          if (input.header !== undefined && String(input.header).trim() !== '') {
+            updateFields.push('header = ?');
+            values.push(String(input.header).trim());
+          }
+          if (input.link !== undefined && String(input.link).trim() !== '') {
+            updateFields.push('`link` = ?');
+            values.push(String(input.link).trim());
+          }
+          if (input.lang !== undefined && String(input.lang).trim() !== '') {
+            updateFields.push('lang = ?');
+            values.push(String(input.lang).trim());
+          }
+          if ('embed' in input) {
+            updateFields.push('embed = ?');
+            values.push(typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : input.embed);
+          }
+          if ('youtubelink' in input) {
+            updateFields.push('youtubelink = ?');
+            values.push(input.youtubelink);
+          }
+          if ('hls' in input) {
+            updateFields.push('hls = ?');
+            values.push(typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : input.hls);
+          }
+          if ('supported_hosts' in input) {
+            updateFields.push('supported_hosts = ?');
+            values.push(
+              Array.isArray(input.supported_hosts) ? JSON.stringify(input.supported_hosts) : input.supported_hosts
+            );
+          }
+
+          if (updateFields.length === 0) {
+            return jsonResponse(200, {
+              message: 'No se enviaron datos válidos para actualizar o no hubieron cambios',
+            });
+          }
+
+          updateFields.push('updated_at = ?');
+          values.push(currentTime);
+          values.push(id);
+
+          await query(`UPDATE anime_videos SET ${updateFields.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, {
+            success: true,
+            message: 'Actualizado correctamente',
+            updated_at: currentTime,
+          });
+        } else {
+          const animeEpisodeId = input.anime_episode_id ?? null;
+          if (!animeEpisodeId) {
+            return jsonResponse(400, { error: 'Falta el parámetro anime_episode_id para el registro' });
+          }
+
+          const server = input.server ?? null;
+          const header = input.header ?? null;
+          const link = input.link ?? null;
+          const lang = input.lang ?? null;
+          const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
+          const youtubelink = input.youtubelink ?? null;
+          const hls = typeof input.hls === 'boolean' ? (input.hls ? 1 : 0) : (input.hls ?? null);
+          const supportedHosts = Array.isArray(input.supported_hosts)
+            ? JSON.stringify(input.supported_hosts)
+            : (input.supported_hosts ?? null);
+
+          const res = await query(
+            'INSERT INTO anime_videos (anime_episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              animeEpisodeId,
+              server,
+              header,
+              link,
+              lang,
+              embed,
+              youtubelink,
+              hls,
+              supportedHosts,
+              currentTime,
+              currentTime,
+            ]
+          );
+
+          return jsonResponse(200, {
+            success: true,
+            message: 'Registrado correctamente',
+            data: {
+              id: String(res.insertId),
+              created_at: currentTime,
+              updated_at: currentTime,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en anime_dooplex: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en anime_dooplex: ' + (err?.message || String(err)) });
   }
 }
 
+// ============================================================================
+// 6. /movie_docines.php & /series_docines.php
+// ============================================================================
 async function handleMovieDocines(request: Request, searchParams: URLSearchParams): Promise<Response> {
   const method = request.method;
   try {
@@ -1005,121 +1114,16 @@ async function handleMovieDocines(request: Request, searchParams: URLSearchParam
         const tmdbid = searchParams.get('tmdbid');
         const movieId = searchParams.get('movie_id');
         if (tmdbid) {
-          const { rows } = await query(
-            'SELECT id, TMDB_ID, name, description, genres, release_date, runtime, poster, banner, youtube_trailer, downloadable, type, status, content_type FROM movies WHERE TMDB_ID = ?',
-            [tmdbid]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, name FROM movies WHERE TMDB_ID = ?', [tmdbid]);
+          return jsonResponse(200, { data: rows });
         } else if (movieId) {
           const { rows } = await query(
-            'SELECT id, name, size, quality, link_order, movie_id, url, type, status, skip_available, intro_start, intro_end, end_credits_marker, link_type, drm_uuid, drm_license_uri FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
+            'SELECT id, name, url, quality, link_order FROM movie_play_links WHERE movie_id = ?',
             [movieId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { data: rows });
         }
-        return jsonResponse(400, { success: false, error: 'Parámetro requerido: tmdbid o movie_id' });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        if (input.movies_id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of [
-            'name',
-            'description',
-            'genres',
-            'release_date',
-            'runtime',
-            'poster',
-            'banner',
-            'youtube_trailer',
-            'downloadable',
-            'type',
-            'status',
-            'content_type',
-          ]) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, { success: false, error: 'No se proporcionaron campos para actualizar' });
-          }
-          values.push(input.movies_id);
-          await query(`UPDATE movies SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Película actualizada correctamente en Docines' });
-        }
-        if (input.id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of [
-            'name',
-            'size',
-            'quality',
-            'link_order',
-            'url',
-            'type',
-            'status',
-            'skip_available',
-            'link_type',
-          ]) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          if (fields.length === 0) {
-            return jsonResponse(400, { success: false, error: 'No se proporcionaron campos para actualizar' });
-          }
-          values.push(input.id);
-          await query(`UPDATE movie_play_links SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Enlace actualizado correctamente en Docines' });
-        }
-        return jsonResponse(400, { success: false, error: 'Se requiere movies_id o id para actualizar' });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.id !== undefined || input.movies_id !== undefined) {
-          return await updateRecord(input);
-        }
-        const maxRes = await query(
-          'SELECT COALESCE(MAX(link_order), 0) + 1 AS next_order FROM movie_play_links WHERE movie_id = ?',
-          [input.movie_id]
-        );
-        const linkOrder = Number(maxRes.rows[0]?.next_order ?? 1);
-        const res = await query(
-          'INSERT INTO movie_play_links (name, size, quality, link_order, movie_id, url, type, status, skip_available, intro_start, intro_end, end_credits_marker, link_type, drm_uuid, drm_license_uri) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            input.name,
-            input.size ?? '1080P',
-            input.quality,
-            linkOrder,
-            input.movie_id,
-            input.url,
-            input.type,
-            input.status ?? 1,
-            input.skip_available ?? 0,
-            input.intro_start ?? '0',
-            input.intro_end ?? '0',
-            input.end_credits_marker ?? '0',
-            input.link_type ?? 0,
-            input.drm_uuid ?? '',
-            input.drm_license_uri ?? '',
-          ]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Enlace insertado correctamente en Docines',
-          id: String(res.insertId),
-          link_order: linkOrder,
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
+        return jsonResponse(200, { error: 'Faltan parámetros (tmdbid o movie_id)' });
       }
 
       if (method === 'DELETE') {
@@ -1128,18 +1132,76 @@ async function handleMovieDocines(request: Request, searchParams: URLSearchParam
           const input = await parseRequestBody(request);
           if (input.id !== undefined) id = String(input.id);
         }
-        if (!id) return jsonResponse(400, { success: false, error: 'Se requiere id' });
-        const res = await query('DELETE FROM movie_play_links WHERE id = ?', [id]);
-        return jsonResponse(res.affectedRows > 0 ? 200 : 404, {
-          success: res.affectedRows > 0,
-          message: res.affectedRows > 0 ? 'Eliminado' : 'No encontrado',
-        });
+        if (!id) return jsonResponse(400, { error: 'Falta el parámetro id' });
+        await query('DELETE FROM movie_play_links WHERE id = ?', [id]);
+        return jsonResponse(200, { message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const id = input.id ?? null;
+        const moviesId = input.movies_id ?? null;
+
+        if (id !== null) {
+          if (!id) return jsonResponse(400, { error: 'Falta el parámetro id para actualizar' });
+          const updates: string[] = [];
+          const values: any[] = [];
+          for (const k of ['name', 'url', 'link_order', 'quality']) {
+            if (input[k] !== undefined && input[k] !== null && input[k] !== '') {
+              updates.push(`${k} = ?`);
+              values.push(input[k]);
+            }
+          }
+          if (updates.length === 0) return jsonResponse(200, { message: 'No hay datos válidos para actualizar' });
+          values.push(id);
+          await query(`UPDATE movie_play_links SET ${updates.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        } else if (moviesId !== null) {
+          if (!moviesId || !input.movie_name || String(input.movie_name).trim() === '') {
+            return jsonResponse(400, { error: 'Faltan parámetros (movies_id o movie_name)' });
+          }
+          await query('UPDATE movies SET name = ? WHERE id = ?', [input.movie_name, moviesId]);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        } else if (method === 'PUT') {
+          return jsonResponse(400, { error: 'Faltan parámetros (id o movies_id)' });
+        } else {
+          const movieId = input.movie_id ?? null;
+          if (!movieId) return jsonResponse(400, { error: 'Falta el parámetro movie_id para el registro' });
+
+          const { rows: orders } = await query(
+            'SELECT link_order FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
+            [movieId]
+          );
+          let nextLinkOrder = 1;
+          for (const row of orders) {
+            const current = Number(row.link_order ?? 0);
+            if (current < nextLinkOrder) continue;
+            if (current === nextLinkOrder) {
+              nextLinkOrder++;
+              continue;
+            }
+            if (current > nextLinkOrder) break;
+          }
+
+          const res = await query(
+            'INSERT INTO movie_play_links (movie_id, name, url, quality, link_order, type, status, skip_available, link_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [movieId, input.name ?? null, input.url ?? null, input.quality ?? null, nextLinkOrder, 'Embed', 1, 0, 0]
+          );
+
+          return jsonResponse(200, {
+            message: 'Registrado correctamente',
+            data: {
+              id: String(res.insertId),
+              link_order: nextLinkOrder,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en movie_docines: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en movie_docines: ' + (err?.message || String(err)) });
   }
 }
 
@@ -1154,123 +1216,27 @@ async function handleSeriesDocines(request: Request, searchParams: URLSearchPara
         const episodeId = searchParams.get('episode_id');
 
         if (tmdbid) {
-          const { rows } = await query('SELECT id, TMDB_ID, name, poster, banner FROM web_series WHERE TMDB_ID = ?', [
-            tmdbid,
-          ]);
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, name FROM web_series WHERE TMDB_ID = ?', [tmdbid]);
+          return jsonResponse(200, { data: rows });
         } else if (webSeriesId) {
           const { rows } = await query(
-            'SELECT id, Session_Name, session_order, web_series_id FROM web_series_seasons WHERE web_series_id = ? ORDER BY session_order ASC',
+            'SELECT id, Session_Name, season_order FROM web_series_seasons WHERE web_series_id = ?',
             [webSeriesId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { data: rows });
         } else if (seasonId) {
           const { rows } = await query(
-            'SELECT id, Episoade_Name, episoade_image, episoade_description, episoade_order, season_id, downloadable, type, status, source, url, skip_available, intro_start, intro_end, end_credits_marker, drm_uuid, drm_license_uri FROM web_series_episoade WHERE season_id = ? ORDER BY episoade_order ASC',
+            'SELECT id, Episoade_Name, episoade_order FROM web_series_episoade WHERE season_id = ? ORDER BY episoade_order ASC, id ASC',
             [seasonId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { data: rows });
         } else if (episodeId) {
-          const { rows } = await query(
-            'SELECT id, name, size, quality, link_order, episode_id, url, type, status, skip_available, intro_start, intro_end, end_credits_marker, link_type, drm_uuid, drm_license_uri FROM episode_play_links WHERE episode_id = ? ORDER BY link_order ASC',
-            [episodeId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT id, name, url, quality FROM episode_play_links WHERE episode_id = ?', [
+            episodeId,
+          ]);
+          return jsonResponse(200, { data: rows });
         }
-        return jsonResponse(400, { success: false, error: 'Parámetro requerido' });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        if (input.episodes_id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of [
-            'Episoade_Name',
-            'episoade_image',
-            'episoade_description',
-            'episoade_order',
-            'downloadable',
-            'type',
-            'status',
-            'source',
-            'url',
-          ]) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          values.push(input.episodes_id);
-          await query(`UPDATE web_series_episoade SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Episodio actualizado en Docines' });
-        }
-        if (input.id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of [
-            'name',
-            'size',
-            'quality',
-            'link_order',
-            'url',
-            'type',
-            'status',
-            'skip_available',
-            'link_type',
-          ]) {
-            if (input[k] !== undefined) {
-              fields.push(`${k} = ?`);
-              values.push(input[k]);
-            }
-          }
-          values.push(input.id);
-          await query(`UPDATE episode_play_links SET ${fields.join(', ')} WHERE id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Enlace actualizado en Docines' });
-        }
-        return jsonResponse(400, { success: false, error: 'Se requiere episodes_id o id' });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.episodes_id !== undefined || input.id !== undefined) {
-          return await updateRecord(input);
-        }
-        const maxRes = await query(
-          'SELECT COALESCE(MAX(link_order), 0) + 1 AS next_order FROM episode_play_links WHERE episode_id = ?',
-          [input.episode_id]
-        );
-        const linkOrder = Number(maxRes.rows[0]?.next_order ?? 1);
-        const res = await query(
-          'INSERT INTO episode_play_links (name, size, quality, link_order, episode_id, url, type, status, skip_available, intro_start, intro_end, end_credits_marker, link_type, drm_uuid, drm_license_uri) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            input.name,
-            input.size ?? '1080P',
-            input.quality,
-            linkOrder,
-            input.episode_id,
-            input.url,
-            input.type,
-            input.status ?? '1',
-            input.skip_available ?? 0,
-            input.intro_start ?? '',
-            input.intro_end ?? '',
-            input.end_credits_marker ?? '0',
-            input.link_type ?? 0,
-            input.drm_uuid ?? '',
-            input.drm_license_uri ?? '',
-          ]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Enlace insertado en Docines',
-          id: String(res.insertId),
-          link_order: linkOrder,
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
+        return jsonResponse(200, { error: 'Faltan parámetros (tmdbid, web_series_id, season_id o episode_id)' });
       }
 
       if (method === 'DELETE') {
@@ -1279,21 +1245,82 @@ async function handleSeriesDocines(request: Request, searchParams: URLSearchPara
           const input = await parseRequestBody(request);
           if (input.id !== undefined) id = String(input.id);
         }
-        if (!id) return jsonResponse(400, { success: false, error: 'Se requiere id' });
-        const res = await query('DELETE FROM episode_play_links WHERE id = ?', [id]);
-        return jsonResponse(res.affectedRows > 0 ? 200 : 404, {
-          success: res.affectedRows > 0,
-          message: res.affectedRows > 0 ? 'Eliminado' : 'No encontrado',
-        });
+        if (!id) return jsonResponse(400, { error: 'Falta el parámetro id' });
+        await query('DELETE FROM episode_play_links WHERE id = ?', [id]);
+        return jsonResponse(200, { message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const id = input.id ?? null;
+        const webSeriesEpisoadeId = input.web_series_episoade_id ?? input.episodes_id ?? null;
+
+        if (webSeriesEpisoadeId !== null) {
+          if (!webSeriesEpisoadeId) {
+            return jsonResponse(400, { error: 'Falta el parámetro web_series_episoade_id para actualizar' });
+          }
+          const updates: string[] = [];
+          const values: any[] = [];
+          for (const k of ['Episoade_Name', 'episoade_image', 'episoade_description']) {
+            if (input[k] !== undefined && input[k] !== null && String(input[k]).trim() !== '') {
+              updates.push(`${k} = ?`);
+              values.push(input[k]);
+            }
+          }
+          if (updates.length === 0) return jsonResponse(200, { message: 'No hay datos válidos para actualizar' });
+          values.push(webSeriesEpisoadeId);
+          await query(`UPDATE web_series_episoade SET ${updates.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        } else if (id !== null) {
+          if (!id) return jsonResponse(400, { error: 'Falta el parámetro id para actualizar' });
+          const updates: string[] = [];
+          const values: any[] = [];
+          for (const k of ['name', 'url', 'quality']) {
+            if (input[k] !== undefined && input[k] !== null && input[k] !== '') {
+              updates.push(`${k} = ?`);
+              values.push(input[k]);
+            }
+          }
+          if (updates.length === 0) return jsonResponse(200, { message: 'No hay datos válidos para actualizar' });
+          values.push(id);
+          await query(`UPDATE episode_play_links SET ${updates.join(', ')} WHERE id = ?`, values);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        } else if (method === 'PUT') {
+          return jsonResponse(400, { error: 'Faltan parámetros (id o web_series_episoade_id)' });
+        } else {
+          const episodeId = input.episode_id ?? null;
+          if (!episodeId) return jsonResponse(400, { error: 'Falta el parámetro episode_id para el registro' });
+
+          const countRes = await query('SELECT COUNT(episode_id) AS cuenta FROM episode_play_links WHERE episode_id = ?', [
+            episodeId,
+          ]);
+          const linkOrder = Number(countRes.rows[0]?.cuenta ?? 0) + 1;
+
+          const res = await query(
+            'INSERT INTO episode_play_links (name, episode_id, url, quality, status, type, skip_available, link_type, link_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [input.name ?? null, episodeId, input.url ?? null, input.quality ?? null, 1, 'Embed', 0, 0, linkOrder]
+          );
+
+          return jsonResponse(200, {
+            message: 'Registrado correctamente',
+            data: {
+              id: String(res.insertId),
+              link_order: linkOrder,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en series_docines: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en series_docines: ' + (err?.message || String(err)) });
   }
 }
 
+// ============================================================================
+// 7. /movie_plusmovie.php, /series_plusmovie.php & /login_plusmovie.php
+// ============================================================================
 async function handleMoviePlusmovie(request: Request, searchParams: URLSearchParams): Promise<Response> {
   const method = request.method;
   try {
@@ -1302,83 +1329,84 @@ async function handleMoviePlusmovie(request: Request, searchParams: URLSearchPar
         const tmdbid = searchParams.get('tmdbid');
         const videosId = searchParams.get('videos_id');
         if (tmdbid) {
-          const { rows } = await query(
-            'SELECT videos_id, tmdbid, title, description, slug, release, runtime, video_quality, thumbnail_url, poster_url FROM videos WHERE tmdbid = ? AND is_tvseries = 0',
-            [tmdbid]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT title, videos_id FROM videos WHERE tmdbid = ?', [tmdbid]);
+          return jsonResponse(200, { data: rows });
         } else if (videosId) {
           const { rows } = await query(
-            'SELECT video_file_id, stream_key, videos_id, file_source, source_type, file_url, label, `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
+            'SELECT video_file_id, file_url, label, `order` FROM video_file WHERE videos_id = ?',
             [videosId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { data: rows });
         }
-        return jsonResponse(400, { success: false, error: 'Parámetro requerido' });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        const fields: string[] = [];
-        const values: any[] = [];
-        for (const k of ['file_source', 'source_type', 'file_url', 'label', 'order']) {
-          if (input[k] !== undefined) {
-            fields.push(`\`${k}\` = ?`);
-            values.push(input[k]);
-          }
-        }
-        values.push(input.video_file_id);
-        await query(`UPDATE video_file SET ${fields.join(', ')} WHERE video_file_id = ?`, values);
-        return jsonResponse(200, { success: true, message: 'Actualizado en PlusMovie' });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.video_file_id !== undefined) {
-          return await updateRecord(input);
-        }
-        const streamKey = generateStreamKey(12);
-        const res = await query(
-          'INSERT INTO video_file (stream_key, videos_id, file_source, source_type, file_url, label, `order`) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            streamKey,
-            input.videos_id,
-            input.file_source,
-            input.source_type,
-            input.file_url,
-            input.label,
-            input.order ?? 0,
-          ]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Insertado en PlusMovie',
-          id: String(res.insertId),
-          stream_key: streamKey,
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
+        return jsonResponse(200, { error: 'Faltan parámetros (tmdbid o videos_id)' });
       }
 
       if (method === 'DELETE') {
-        let id = searchParams.get('video_file_id');
-        if (!id) {
+        let videoFileId = searchParams.get('video_file_id');
+        if (!videoFileId) {
           const input = await parseRequestBody(request);
-          if (input.video_file_id !== undefined) id = String(input.video_file_id);
+          if (input.video_file_id !== undefined) videoFileId = String(input.video_file_id);
         }
-        const res = await query('DELETE FROM video_file WHERE video_file_id = ?', [id]);
-        return jsonResponse(res.affectedRows > 0 ? 200 : 404, {
-          success: res.affectedRows > 0,
-          message: res.affectedRows > 0 ? 'Eliminado' : 'No encontrado',
-        });
+        if (!videoFileId) return jsonResponse(400, { error: 'Falta el parámetro video_file_id' });
+        await query('DELETE FROM video_file WHERE video_file_id = ?', [videoFileId]);
+        return jsonResponse(200, { message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const videoFileId = input.video_file_id ?? null;
+
+        if (method === 'PUT' || videoFileId !== null) {
+          if (!videoFileId) return jsonResponse(400, { error: 'Falta el parámetro video_file_id para actualizar' });
+          await query('UPDATE video_file SET file_url = ?, label = ?, `order` = ? WHERE video_file_id = ?', [
+            input.file_url,
+            input.label,
+            input.order,
+            videoFileId,
+          ]);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        } else {
+          const videosId = input.videos_id ?? null;
+          if (!videosId || !input.file_url || !input.label) {
+            return jsonResponse(400, { error: 'Faltan parámetros (videos_id, file_url, label)' });
+          }
+
+          const { rows: orders } = await query(
+            'SELECT `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
+            [videosId]
+          );
+          let nextOrder = 1;
+          for (const row of orders) {
+            const current = Number(row.order ?? 0);
+            if (current < nextOrder) continue;
+            if (current === nextOrder) {
+              nextOrder++;
+              continue;
+            }
+            if (current > nextOrder) break;
+          }
+
+          const streamKey = generateStreamKey(12);
+          const res = await query(
+            'INSERT INTO video_file (stream_key, videos_id, file_source, source_type, file_url, label, `order`) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [streamKey, videosId, 'embed', 'link', input.file_url, input.label, nextOrder]
+          );
+
+          return jsonResponse(200, {
+            message: 'Registrado correctamente',
+            data: {
+              video_file_id: String(res.insertId),
+              stream_key: streamKey,
+              order: nextOrder,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en movie_plusmovie: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en movie_plusmovie: ' + (err?.message || String(err)) });
   }
 }
 
@@ -1387,146 +1415,110 @@ async function handleSeriesPlusmovie(request: Request, searchParams: URLSearchPa
   try {
     return await withMysql(PLUSMOVIE_CONFIG, async (query) => {
       if (method === 'GET') {
-        const tmdbid = searchParams.get('tmdbid');
         const title = searchParams.get('title');
         const videosInfoId = searchParams.get('videos_info_id');
+        const tmdbid = searchParams.get('tmdbid');
         const videosId = searchParams.get('videos_id');
         const seasonsId = searchParams.get('seasons_id');
 
-        if (tmdbid) {
-          const { rows } = await query(
-            'SELECT videos_id, tmdbid, title, thumbnail_url, poster_url FROM videos WHERE tmdbid = ?',
-            [tmdbid]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
-        } else if (title) {
-          const { rows } = await query(
-            'SELECT videos_id, tmdbid, title, description, slug, release, runtime, video_quality, thumbnail_url, poster_url FROM videos WHERE title LIKE ? LIMIT 50',
-            [`%${title}%`]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+        if (title) {
+          const { rows } = await query('SELECT videos_id, title, tmdbid FROM videos WHERE title LIKE ?', [`%${title}%`]);
+          return jsonResponse(200, { data: rows });
         } else if (videosInfoId) {
-          const { rows } = await query(
-            'SELECT videos_id, tmdbid, title, description, slug, release, runtime, video_quality, thumbnail_url, poster_url FROM videos WHERE videos_id = ?',
-            [videosInfoId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT videos_id, title, tmdbid FROM videos WHERE videos_id = ?', [
+            videosInfoId,
+          ]);
+          return jsonResponse(200, { data: rows });
+        } else if (tmdbid) {
+          const { rows } = await query('SELECT videos_id, title FROM videos WHERE tmdbid = ?', [tmdbid]);
+          return jsonResponse(200, { data: rows });
         } else if (videosId) {
-          const { rows } = await query(
-            'SELECT seasons_id, videos_id, seasons_name, `order` FROM seasons WHERE videos_id = ? ORDER BY `order` ASC',
-            [videosId]
-          );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          const { rows } = await query('SELECT seasons_id, seasons_name, `order` FROM seasons WHERE videos_id = ?', [
+            videosId,
+          ]);
+          return jsonResponse(200, { data: rows });
         } else if (seasonsId) {
           const { rows } = await query(
-            'SELECT episodes_id, stream_key, videos_id, seasons_id, episodes_name, file_source, source_type, file_url, `order`, date_added, last_ep_added, image_url FROM episodes WHERE seasons_id = ? ORDER BY `order` ASC',
+            'SELECT episodes_id, episodes_name, file_url, `order` FROM episodes WHERE seasons_id = ?',
             [seasonsId]
           );
-          return jsonResponse(200, { success: true, data: rows, count: rows.length });
+          return jsonResponse(200, { data: rows });
         }
-        return jsonResponse(400, { success: false, error: 'Parámetro requerido' });
-      }
-
-      const updateRecord = async (input: Record<string, any>) => {
-        if (input.videos_id_update !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          for (const k of [
-            'tmdbid',
-            'title',
-            'description',
-            'slug',
-            'release',
-            'runtime',
-            'video_quality',
-            'thumbnail_url',
-            'poster_url',
-          ]) {
-            if (input[k] !== undefined) {
-              fields.push(`\`${k}\` = ?`);
-              values.push(input[k]);
-            }
-          }
-          values.push(input.videos_id_update);
-          await query(`UPDATE videos SET ${fields.join(', ')} WHERE videos_id = ?`, values);
-          return jsonResponse(200, { success: true, message: 'Actualizado en PlusMovie' });
-        }
-        if (input.episodes_id !== undefined) {
-          const fields: string[] = [];
-          const values: any[] = [];
-          const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
-          for (const k of ['episodes_name', 'file_source', 'source_type', 'file_url', 'order', 'image_url']) {
-            if (input[k] !== undefined) {
-              fields.push(`\`${k}\` = ?`);
-              values.push(input[k]);
-            }
-          }
-          fields.push('last_ep_added = ?');
-          values.push(nowStr);
-          values.push(input.episodes_id);
-          await query(`UPDATE episodes SET ${fields.join(', ')} WHERE episodes_id = ?`, values);
-          return jsonResponse(200, {
-            success: true,
-            message: 'Episodio actualizado en PlusMovie',
-            data: { last_ep_added: nowStr },
-          });
-        }
-        return jsonResponse(400, { success: false, error: 'Se requiere episodes_id o videos_id_update' });
-      };
-
-      if (method === 'POST') {
-        const input = await parseRequestBody(request);
-        if (input.episodes_id !== undefined || input.videos_id_update !== undefined) {
-          return await updateRecord(input);
-        }
-        const streamKey = generateStreamKey(12);
-        const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const res = await query(
-          'INSERT INTO episodes (stream_key, videos_id, seasons_id, episodes_name, file_source, source_type, file_url, `order`, date_added, last_ep_added, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [
-            streamKey,
-            input.videos_id,
-            input.seasons_id,
-            input.episodes_name,
-            input.file_source,
-            input.source_type,
-            input.file_url,
-            input.order,
-            nowStr,
-            nowStr,
-            input.image_url,
-          ]
-        );
-        return jsonResponse(200, {
-          success: true,
-          message: 'Episodio insertado en PlusMovie',
-          id: String(res.insertId),
-          stream_key: streamKey,
-        });
-      }
-
-      if (method === 'PUT') {
-        const input = await parseRequestBody(request);
-        return await updateRecord(input);
+        return jsonResponse(400, { error: 'Faltan parámetros (tmdbid, videos_id o seasons_id)' });
       }
 
       if (method === 'DELETE') {
-        let id = searchParams.get('episodes_id');
-        if (!id) {
+        let episodesId = searchParams.get('episodes_id');
+        if (!episodesId) {
           const input = await parseRequestBody(request);
-          if (input.episodes_id !== undefined) id = String(input.episodes_id);
+          if (input.episodes_id !== undefined) episodesId = String(input.episodes_id);
         }
-        const res = await query('DELETE FROM episodes WHERE episodes_id = ?', [id]);
-        return jsonResponse(res.affectedRows > 0 ? 200 : 404, {
-          success: res.affectedRows > 0,
-          message: res.affectedRows > 0 ? 'Eliminado' : 'No encontrado',
-        });
+        if (!episodesId) return jsonResponse(400, { error: 'Falta el parámetro episodes_id' });
+        await query('DELETE FROM episodes WHERE episodes_id = ?', [episodesId]);
+        return jsonResponse(200, { message: 'Eliminado correctamente' });
       }
 
-      return jsonResponse(405, { success: false, error: 'Método no permitido' });
+      if (method === 'POST' || method === 'PUT') {
+        const input = await parseRequestBody(request);
+        const episodesId = input.episodes_id ?? null;
+        const videosId = input.videos_id ?? null;
+        const seasonsId = input.seasons_id ?? null;
+        const title = input.title ?? null;
+        const tmdbid = input.tmdbid ?? null;
+        const currentDate = nowDatetime();
+
+        if (episodesId === null && seasonsId === null && videosId !== null && (title !== null || tmdbid !== null)) {
+          if (!title || !tmdbid) {
+            return jsonResponse(400, { error: 'Faltan parámetros (videos_id, title, tmdbid)' });
+          }
+          await query('UPDATE videos SET title = ?, tmdbid = ? WHERE videos_id = ?', [title, tmdbid, videosId]);
+          return jsonResponse(200, { message: 'Actualizado correctamente' });
+        }
+
+        if (method === 'PUT' || episodesId !== null) {
+          if (!episodesId) return jsonResponse(400, { error: 'Falta el parámetro episodes_id para actualizar' });
+          await query(
+            'UPDATE episodes SET episodes_name = ?, file_url = ?, `order` = ?, last_ep_added = ? WHERE episodes_id = ?',
+            [input.episodes_name, input.file_url, input.order, currentDate, episodesId]
+          );
+          return jsonResponse(200, { message: 'Actualizado correctamente', last_ep_added: currentDate });
+        } else {
+          if (!seasonsId || !videosId) {
+            return jsonResponse(400, {
+              error: 'Faltan parámetros requeridos (seasons_id o videos_id) para el registro',
+            });
+          }
+          const streamKey = generateStreamKey(12);
+          const res = await query(
+            'INSERT INTO episodes (stream_key, videos_id, seasons_id, episodes_name, file_source, source_type, file_url, `order`, date_added, last_ep_added) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              streamKey,
+              videosId,
+              seasonsId,
+              input.episodes_name ?? null,
+              input.file_source ?? 'embed',
+              input.source_type ?? 'link',
+              input.file_url ?? null,
+              input.order ?? null,
+              currentDate,
+              currentDate,
+            ]
+          );
+          return jsonResponse(200, {
+            message: 'Registrado correctamente',
+            data: {
+              episodes_id: String(res.insertId),
+              stream_key: streamKey,
+              date_added: currentDate,
+            },
+          });
+        }
+      }
+
+      return jsonResponse(405, { error: 'Método no permitido' });
     });
   } catch (err: any) {
-    return jsonResponse(500, { success: false, error: 'Error en series_plusmovie: ' + (err?.message || String(err)) });
+    return jsonResponse(500, { error: 'Error en series_plusmovie: ' + (err?.message || String(err)) });
   }
 }
 
@@ -1640,9 +1632,7 @@ async function handleProxy(request: Request): Promise<Response> {
           outgoingHeaders[k] = String(v);
         }
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   const customCookies = request.headers.get('x-proxy-cookies');
@@ -1684,14 +1674,13 @@ async function handleProxy(request: Request): Promise<Response> {
 }
 
 // ============================================================================
-// Cloudflare Pages _worker.js Entrypoint
+// Cloudflare Workers Entrypoint
 // ============================================================================
 export default {
   async fetch(request: Request, env: any): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // Handle CORS preflight for all API routes
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
@@ -1729,7 +1718,6 @@ export default {
         return await handleProxy(request);
     }
 
-    // Serve static files and SPA fallback via Cloudflare Pages ASSETS binding
     if (env && env.ASSETS) {
       const assetRes = await env.ASSETS.fetch(request);
       if (assetRes.status === 404 && request.method === 'GET' && !pathname.includes('.')) {
@@ -1742,4 +1730,3 @@ export default {
     return new Response('Not found', { status: 404 });
   },
 };
-
