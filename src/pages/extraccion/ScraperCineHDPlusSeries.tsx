@@ -410,13 +410,14 @@ export default function ScraperCineHDPlusSeries() {
       addLog(`Obteniendo token desde: ${iframeSrc}`);
       const playerHtml = await fetchHTML(iframeSrc, targetUrl);
 
+      const payloadMatch = playerHtml.match(
+        /\{\s*type\s*:\s*['"](tv|movie)['"]\s*,\s*id\s*:\s*['"]([^'"]+)['"]\s*,\s*token\s*:\s*['"]([^'"]+)['"]\s*\}/i
+      );
       const tokenMatch = playerHtml.match(/token\s*:\s*['"]([^'"]+)['"]/i);
-      const idInScriptMatch = playerHtml.match(/id\s*:\s*['"]([^'"]+)['"]/i);
-      const typeInScriptMatch = playerHtml.match(/type\s*:\s*['"]([^'"]+)['"]/i);
 
-      const finalId = idInScriptMatch?.[1] || extractedSeriesId;
-      const finalType = typeInScriptMatch?.[1] || 'tv';
-      const finalToken = tokenMatch?.[1] || '';
+      const finalType = payloadMatch?.[1] || 'tv';
+      const finalId = payloadMatch?.[2] || extractedSeriesId;
+      const finalToken = payloadMatch?.[3] || tokenMatch?.[1] || '';
 
       if (!finalId || !finalToken) {
         addLog('No se pudo extraer el token o ID desde el reproductor de PlayLatinSRC.', true);
