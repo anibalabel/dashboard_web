@@ -95,7 +95,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
       languageKey: 'lat',
       serverName: 'vidara',
       rawUrl: 'https://vidara.to/e/4Y2q4yZDtxGWw',
-      formattedUrl: 'https://vidara.to/e/4Y2q4yZDtxGWw',
+      formattedUrl: 'https://vidara.so/v/4Y2q4yZDtxGWw',
     });
   });
 
@@ -142,7 +142,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     expect(allGroups[2]).toEqual({
       server: 'vidara',
       title: 'Película Multi',
-      lat: ['https://vidara.to/e/lat333'],
+      lat: ['https://vidara.so/v/lat333'],
       cast: [],
       sub: [],
       other: [],
@@ -167,7 +167,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     const parsed1 = parsePelisplusLaHtml(htmlWithMissingDataName);
     expect(parsed1.options).toHaveLength(1);
     expect(parsed1.options[0].languageKey).toBe('sub');
-    expect(parsed1.options[0].formattedUrl).toBe('https://vidara.to/e/abc123');
+    expect(parsed1.options[0].formattedUrl).toBe('https://vidara.so/v/abc123');
 
     const htmlIframeOnly = `
       <div class="player">
@@ -235,7 +235,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     });
     expect(parsed.options[1].formattedUrl).toBe('https://streamwish.fun/e/fz152tqxw5eu');
     expect(parsed.options[2].formattedUrl).toBe('https://smoothpre.com/v/6ln458z1trpu');
-    expect(parsed.options[3].formattedUrl).toBe('https://vidara.to/e/hk3n29s0gTbL9');
+    expect(parsed.options[3].formattedUrl).toBe('https://vidara.so/v/hk3n29s0gTbL9');
 
     expect(matchesPelisplusLaServer(parsed.options[0], 'voe')).toBe(true);
     expect(matchesPelisplusLaServer(parsed.options[1], 'voe')).toBe(false);
@@ -378,7 +378,7 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
     expect(isPelisplusLaServerFilterActive('waaw', 'voesx')).toBe(false);
   });
 
-  it('cambia dominio de Uqload a https://uqload.vc, Doodstream a https://playmogo.com y Vidhide a https://smoothpre.com en pelisplushd.la', () => {
+  it('cambia dominio de Uqload a https://uqload.vc, Doodstream a https://playmogo.com, Vidhide a https://smoothpre.com y Vidara a https://vidara.so/v/VIDEO_ID en pelisplushd.la', () => {
     expect(
       formatPelisplusLaOptionUrl('https://uqload.io/embed-xbsidtff7mme.html', 'uqload')
     ).toBe('https://uqload.vc/embed-xbsidtff7mme.html');
@@ -403,6 +403,15 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
     expect(formatPelisplusLaOptionUrl('https://vidhide.com/embed-vh789012.html')).toBe(
       'https://smoothpre.com/v/vh789012'
     );
+    expect(formatPelisplusLaOptionUrl('https://vidara.to/e/4Y2q4yZDtxGWw', 'vidara')).toBe(
+      'https://vidara.so/v/4Y2q4yZDtxGWw'
+    );
+    expect(formatPelisplusLaOptionUrl('https://vidara.so/e/vr123456')).toBe(
+      'https://vidara.so/v/vr123456'
+    );
+    expect(formatPelisplusLaOptionUrl('https://vidara.to/v/vr789012')).toBe(
+      'https://vidara.so/v/vr789012'
+    );
 
     const html = `
       <div class="player">
@@ -411,12 +420,13 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
           <li class="playurl" data-url="https://uqload.to/embed-test111.html" data-name="Español Latino"><a href="#option1">Uqload</a></li>
           <li class="playurl" data-url="https://dood.so/e/test222" data-name="Español Latino"><a href="#option2">Doodstream</a></li>
           <li class="playurl" data-url="https://vidhidepro.com/v/test333" data-name="Español Latino"><a href="#option3">vidhide</a></li>
+          <li class="playurl" data-url="https://vidara.to/e/test444" data-name="Español Latino"><a href="#option4">vidara</a></li>
         </ul>
       </div>
     `;
 
     const parsed = parsePelisplusLaHtml(html);
-    expect(parsed.options).toHaveLength(3);
+    expect(parsed.options).toHaveLength(4);
     expect(parsed.options[0].serverName).toBe('uqload');
     expect(parsed.options[0].formattedUrl).toBe('https://uqload.vc/embed-test111.html');
     expect(matchesPelisplusLaServer(parsed.options[0], 'uqload')).toBe(true);
@@ -426,5 +436,8 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
     expect(parsed.options[2].serverName).toBe('vidhide');
     expect(parsed.options[2].formattedUrl).toBe('https://smoothpre.com/v/test333');
     expect(matchesPelisplusLaServer(parsed.options[2], 'vidhide')).toBe(true);
+    expect(parsed.options[3].serverName).toBe('vidara');
+    expect(parsed.options[3].formattedUrl).toBe('https://vidara.so/v/test444');
+    expect(matchesPelisplusLaServer(parsed.options[3], 'vidara')).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import {
   isStreamwishUrlOrServer,
 } from './doodstreamUtils';
 import { extractEarnvidsVideoId } from './earnvidsUtils';
+import { getVidaraUrl } from './vidaraUtils';
 import { getProxyUrl } from './proxy';
 import { isEmbed69BotChallenge } from './embed69Utils';
 
@@ -51,7 +52,7 @@ export const PELISPLUS_LA_PRESET_SERVERS = [
   { value: 'voe', label: 'VOE (voesx)' },
   { value: 'streamwish', label: 'StreamWish' },
   { value: 'vidhide', label: 'Vidhide (smoothpre)' },
-  { value: 'vidara', label: 'Vidara' },
+  { value: 'vidara', label: 'Vidara (vidara.so)' },
   { value: 'filelions', label: 'Filelions' },
   { value: 'streamtape', label: 'Streamtape' },
   { value: 'uqload', label: 'Uqload (uqload.vc)' },
@@ -289,11 +290,22 @@ function replaceUrlHost(targetUrl: string, newHost: string): string {
   }
 }
 
+function rewriteWatchUrlWithId(
+  rawUrl: string,
+  fallbackFormattedUrl: string,
+  targetHost: string,
+  buildWatchUrl: (videoId: string) => string
+): string {
+  const videoId = extractEarnvidsVideoId(rawUrl);
+  return videoId ? buildWatchUrl(videoId) : replaceUrlHost(fallbackFormattedUrl, targetHost);
+}
+
 /**
  * Formats an extracted PelisplusHD.la option URL:
  * - Uqload links are rewritten to https://uqload.vc
  * - Doodstream links are normalized to https://playmogo.com/e/VIDEO_ID
  * - Vidhide links are normalized to https://smoothpre.com/v/VIDEO_ID
+ * - Vidara links are normalized to https://vidara.so/v/VIDEO_ID
  * - Other servers keep standard formatDoodstreamUrl normalization
  */
 export function formatPelisplusLaOptionUrl(rawUrl: string, serverName?: string): string {
@@ -312,8 +324,21 @@ export function formatPelisplusLaOptionUrl(rawUrl: string, serverName?: string):
     Boolean(serverName && /vidhide/i.test(serverName)) ||
     /(?:^|\.)vidhide[a-z0-9-]*\.[a-z0-9-]+$/i.test(hostname);
   if (isVidhide) {
-    const videoId = extractEarnvidsVideoId(rawUrl);
-    return videoId ? `https://smoothpre.com/v/${videoId}` : replaceUrlHost(formatted, 'smoothpre.com');
+    return rewriteWatchUrlWithId(
+      rawUrl,
+      formatted,
+      'smoothpre.com',
+      (videoId) => `https://smoothpre.com/v/${videoId}`
+    );
+  }
+
+  const isVidara =
+    Boolean(serverName && /vidara/i.test(serverName)) ||
+    /(?:^|\.)vidara\.[a-z0-9-]+$/i.test(hostname);
+  if (isVidara) {
+    return rewriteWatchUrlWithId(rawUrl, formatted, 'vidara.so', (videoId) =>
+      getVidaraUrl(videoId, 'watch')
+    );
   }
 
   const isDoodstream =
