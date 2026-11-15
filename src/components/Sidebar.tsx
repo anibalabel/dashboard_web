@@ -311,6 +311,30 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   Movies Pelisplus
                 </Link>
                 <Link
+                  to="/extraccion/series-pelisplus-la"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/extraccion/series-pelisplus-la'
+                      ? 'bg-red-50 text-red-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <ListVideo className="h-4 w-4" />
+                  Series Pelisplus.la
+                </Link>
+                <Link
+                  to="/extraccion/movies-pelisplus-la"
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/extraccion/movies-pelisplus-la'
+                      ? 'bg-red-50 text-red-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <Film className="h-4 w-4" />
+                  Movies Pelisplus.la
+                </Link>
+                <Link
                   to="/extraccion/series-cinemitas"
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${

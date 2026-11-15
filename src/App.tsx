@@ -26,6 +26,8 @@ import ScraperMoviesGnula from "@/pages/extraccion/ScraperMoviesGnula";
 import ScraperMoviesGnulaV2 from "@/pages/extraccion/ScraperMoviesGnulaV2";
 import ScraperPelisplusSeries from "@/pages/extraccion/ScraperPelisplusSeries";
 import ScraperMoviesPelisplus from "@/pages/extraccion/ScraperMoviesPelisplus";
+import ScraperSeriesPelisplusLa from "@/pages/extraccion/ScraperSeriesPelisplusLa";
+import ScraperMoviesPelisplusLa from "@/pages/extraccion/ScraperMoviesPelisplusLa";
 import ScraperCinemitasSeries from "@/pages/extraccion/ScraperCinemitasSeries";
 import ScraperMoviesCinemitas from "@/pages/extraccion/ScraperMoviesCinemitas";
 import ScraperMoviesCinemitasV2 from "@/pages/extraccion/ScraperMoviesCinemitasV2";
@@ -81,6 +83,8 @@ export default function App() {
           <Route path="/extraccion/movies-gnula-v2" element={<ScraperMoviesGnulaV2 />} />
           <Route path="/extraccion/series-pelisplus" element={<ScraperPelisplusSeries />} />
           <Route path="/extraccion/movies-pelisplus" element={<ScraperMoviesPelisplus />} />
+          <Route path="/extraccion/series-pelisplus-la" element={<ScraperSeriesPelisplusLa />} />
+          <Route path="/extraccion/movies-pelisplus-la" element={<ScraperMoviesPelisplusLa />} />
           <Route path="/extraccion/series-cinemitas" element={<ScraperCinemitasSeries />} />
           <Route path="/extraccion/movies-cinemitas" element={<ScraperMoviesCinemitas />} />
           <Route path="/extraccion/movies-cinemitas-v2" element={<ScraperMoviesCinemitasV2 />} />
