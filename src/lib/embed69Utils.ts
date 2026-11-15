@@ -310,6 +310,13 @@ export function extractCleanUrlFromEmbedLink(rawLink: string): string {
 }
 
 /**
+ * Detects the anti-bot interstitial (Anubis) that embed69 may serve instead of the player.
+ */
+export function isEmbed69BotChallenge(html: string): boolean {
+  return /not a bot|\.within\.website|anubis/i.test(html);
+}
+
+/**
  * Parses Embed69 iframe HTML, solves Proof-of-Work (PoW) if present, and decrypts AES links.
  */
 export async function parseAndDecryptEmbed69(
@@ -323,6 +330,12 @@ export async function parseAndDecryptEmbed69(
     iframeHtml.match(/(?:const\s+data|var\s+dataLink)\s*=\s*(\[[\s\S]*?\]);/);
 
   if (!dataMatch) {
+    if (isEmbed69BotChallenge(iframeHtml)) {
+      throw new Error(
+        'Embed69 devolvió una página anti-bot (Anubis: "Making sure you\'re not a bot!") en lugar del reproductor. ' +
+          'El proxy no puede obtener los datos mientras el desafío esté activo.'
+      );
+    }
     return null;
   }
 
