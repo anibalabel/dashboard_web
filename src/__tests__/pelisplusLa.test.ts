@@ -87,7 +87,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
       languageKey: 'lat',
       serverName: 'vidhide',
       rawUrl: 'https://vidhidepro.com/v/byi2e6efgtz0',
-      formattedUrl: 'https://vidhidepro.com/v/byi2e6efgtz0',
+      formattedUrl: 'https://smoothpre.com/v/byi2e6efgtz0',
     });
 
     expect(parsed.options[2]).toEqual({
@@ -134,9 +134,9 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     expect(allGroups[1]).toEqual({
       server: 'vidhide',
       title: 'Película Multi',
-      lat: ['https://vidhidepro.com/v/lat222'],
+      lat: ['https://smoothpre.com/v/lat222'],
       cast: [],
-      sub: ['https://vidhidepro.com/v/sub222'],
+      sub: ['https://smoothpre.com/v/sub222'],
       other: [],
     });
     expect(allGroups[2]).toEqual({
@@ -151,8 +151,8 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     const onlyVidhide = groupOptionsByServer(parsed.options, parsed.title, 'vidhide');
     expect(onlyVidhide).toHaveLength(1);
     expect(onlyVidhide[0].server).toBe('vidhide');
-    expect(onlyVidhide[0].lat).toEqual(['https://vidhidepro.com/v/lat222']);
-    expect(onlyVidhide[0].sub).toEqual(['https://vidhidepro.com/v/sub222']);
+    expect(onlyVidhide[0].lat).toEqual(['https://smoothpre.com/v/lat222']);
+    expect(onlyVidhide[0].sub).toEqual(['https://smoothpre.com/v/sub222']);
   });
 
   it('usa fallback de .divseason y #video-content iframe cuando falta data-name o li.playurl', () => {
@@ -183,7 +183,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
     expect(parsed2.options).toHaveLength(1);
     expect(parsed2.options[0].languageKey).toBe('cast');
     expect(parsed2.options[0].serverName).toBe('vidhide');
-    expect(parsed2.options[0].formattedUrl).toBe('https://vidhidepro.com/v/xyz789');
+    expect(parsed2.options[0].formattedUrl).toBe('https://smoothpre.com/v/xyz789');
   });
 
   it('extrae el título desde <title> si no hay <h1> útil', () => {
@@ -234,7 +234,7 @@ describe('PelisplusHD.la Utils - parsePelisplusLaHtml', () => {
       formattedUrl: 'https://voe.sx/e/bdeomotlcbf5',
     });
     expect(parsed.options[1].formattedUrl).toBe('https://streamwish.fun/e/fz152tqxw5eu');
-    expect(parsed.options[2].formattedUrl).toBe('https://vidhidepro.com/v/6ln458z1trpu');
+    expect(parsed.options[2].formattedUrl).toBe('https://smoothpre.com/v/6ln458z1trpu');
     expect(parsed.options[3].formattedUrl).toBe('https://vidara.to/e/hk3n29s0gTbL9');
 
     expect(matchesPelisplusLaServer(parsed.options[0], 'voe')).toBe(true);
@@ -378,7 +378,7 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
     expect(isPelisplusLaServerFilterActive('waaw', 'voesx')).toBe(false);
   });
 
-  it('cambia dominio de Uqload a https://uqload.vc y Doodstream a https://playmogo.com en pelisplushd.la', () => {
+  it('cambia dominio de Uqload a https://uqload.vc, Doodstream a https://playmogo.com y Vidhide a https://smoothpre.com en pelisplushd.la', () => {
     expect(
       formatPelisplusLaOptionUrl('https://uqload.io/embed-xbsidtff7mme.html', 'uqload')
     ).toBe('https://uqload.vc/embed-xbsidtff7mme.html');
@@ -394,6 +394,15 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
     expect(formatPelisplusLaOptionUrl('https://ds2play.com/e/qwe45678')).toBe(
       'https://playmogo.com/e/qwe45678'
     );
+    expect(formatPelisplusLaOptionUrl('https://vidhidepro.com/v/byi2e6efgtz0', 'vidhide')).toBe(
+      'https://smoothpre.com/v/byi2e6efgtz0'
+    );
+    expect(formatPelisplusLaOptionUrl('https://vidhidefast.com/e/vh123456')).toBe(
+      'https://smoothpre.com/v/vh123456'
+    );
+    expect(formatPelisplusLaOptionUrl('https://vidhide.com/embed-vh789012.html')).toBe(
+      'https://smoothpre.com/v/vh789012'
+    );
 
     const html = `
       <div class="player">
@@ -401,17 +410,21 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
         <ul class="TbVideoNv nav nav-tabs">
           <li class="playurl" data-url="https://uqload.to/embed-test111.html" data-name="Español Latino"><a href="#option1">Uqload</a></li>
           <li class="playurl" data-url="https://dood.so/e/test222" data-name="Español Latino"><a href="#option2">Doodstream</a></li>
+          <li class="playurl" data-url="https://vidhidepro.com/v/test333" data-name="Español Latino"><a href="#option3">vidhide</a></li>
         </ul>
       </div>
     `;
 
     const parsed = parsePelisplusLaHtml(html);
-    expect(parsed.options).toHaveLength(2);
+    expect(parsed.options).toHaveLength(3);
     expect(parsed.options[0].serverName).toBe('uqload');
     expect(parsed.options[0].formattedUrl).toBe('https://uqload.vc/embed-test111.html');
     expect(matchesPelisplusLaServer(parsed.options[0], 'uqload')).toBe(true);
     expect(parsed.options[1].serverName).toBe('doodstream');
     expect(parsed.options[1].formattedUrl).toBe('https://playmogo.com/e/test222');
     expect(matchesPelisplusLaServer(parsed.options[1], 'doodstream')).toBe(true);
+    expect(parsed.options[2].serverName).toBe('vidhide');
+    expect(parsed.options[2].formattedUrl).toBe('https://smoothpre.com/v/test333');
+    expect(matchesPelisplusLaServer(parsed.options[2], 'vidhide')).toBe(true);
   });
 });

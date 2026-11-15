@@ -3,6 +3,7 @@ import {
   isEarnvidsUrlOrServer,
   isStreamwishUrlOrServer,
 } from './doodstreamUtils';
+import { extractEarnvidsVideoId } from './earnvidsUtils';
 import { getProxyUrl } from './proxy';
 import { isEmbed69BotChallenge } from './embed69Utils';
 
@@ -49,7 +50,7 @@ export const PELISPLUS_LA_PRESET_SERVERS = [
   { value: 'all', label: 'Todos los servidores' },
   { value: 'voe', label: 'VOE (voesx)' },
   { value: 'streamwish', label: 'StreamWish' },
-  { value: 'vidhide', label: 'Vidhide' },
+  { value: 'vidhide', label: 'Vidhide (smoothpre)' },
   { value: 'vidara', label: 'Vidara' },
   { value: 'filelions', label: 'Filelions' },
   { value: 'streamtape', label: 'Streamtape' },
@@ -292,6 +293,7 @@ function replaceUrlHost(targetUrl: string, newHost: string): string {
  * Formats an extracted PelisplusHD.la option URL:
  * - Uqload links are rewritten to https://uqload.vc
  * - Doodstream links are normalized to https://playmogo.com/e/VIDEO_ID
+ * - Vidhide links are normalized to https://smoothpre.com/v/VIDEO_ID
  * - Other servers keep standard formatDoodstreamUrl normalization
  */
 export function formatPelisplusLaOptionUrl(rawUrl: string, serverName?: string): string {
@@ -304,6 +306,14 @@ export function formatPelisplusLaOptionUrl(rawUrl: string, serverName?: string):
     /(?:^|\.)uqload\.[a-z0-9-]+$/i.test(hostname);
   if (isUqload) {
     return replaceUrlHost(formatted, 'uqload.vc');
+  }
+
+  const isVidhide =
+    Boolean(serverName && /vidhide/i.test(serverName)) ||
+    /(?:^|\.)vidhide[a-z0-9-]*\.[a-z0-9-]+$/i.test(hostname);
+  if (isVidhide) {
+    const videoId = extractEarnvidsVideoId(rawUrl);
+    return videoId ? `https://smoothpre.com/v/${videoId}` : replaceUrlHost(formatted, 'smoothpre.com');
   }
 
   const isDoodstream =
