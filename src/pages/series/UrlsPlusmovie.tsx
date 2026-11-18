@@ -10,6 +10,7 @@ import {
   updatePlusmovieEpisode
 } from '../../services/api';
 import { PlusmovieEpisode, PlusmovieSeason, PlusmovieSerie } from '../../types';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsPlusmovie() {
@@ -138,16 +139,17 @@ export default function UrlsPlusmovie() {
   const handleSave = async () => {
     if (!editingId) return;
     try {
+      const normalizedUrl = formatDoodstreamUrl(editForm.file_url || '');
       await updatePlusmovieEpisode({
         episodes_id: editingId,
         episodes_name: editForm.episodes_name,
-        file_url: editForm.file_url,
+        file_url: normalizedUrl,
         order: editForm.order
       });
 
       setEpisodes(prev =>
         prev
-          .map(ep => (ep.episodes_id === editingId ? ({ ...ep, ...editForm } as PlusmovieEpisode) : ep))
+          .map(ep => (ep.episodes_id === editingId ? ({ ...ep, ...editForm, file_url: normalizedUrl } as PlusmovieEpisode) : ep))
           .slice()
           .sort((a, b) => a.order - b.order)
       );

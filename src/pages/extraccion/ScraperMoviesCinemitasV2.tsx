@@ -193,7 +193,7 @@ export default function ScraperMoviesCinemitasV2() {
               const lower = urlOrText.toLowerCase();
               if (target === 'uqload') return lower.includes('uqload');
               if (target === 'vidara') return lower.includes('vidara');
-              if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse');
+              if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse') || lower.includes('filemoon');
               if (target === 'audinifer') return lower.includes('audinifer');
               if (target === 'earnvids' || target === 'smoothpre') return lower.includes('earnvids') || lower.includes('earnvid') || lower.includes('smoothpre');
               return lower.includes(target.toLowerCase());
@@ -329,7 +329,7 @@ export default function ScraperMoviesCinemitasV2() {
                   <option value="earnvids">EarnVids (smoothpre.com)</option>
                   <option value="uqload">Uqload</option>
                   <option value="vidara">Vidara (vidara.so)</option>
-                  <option value="byse">Byse (bysezoxexe.com)</option>
+                  <option value="byse">FileMoon / Bysekoze (bysekoze.com)</option>
                   <option value="audinifer">Audinifer (audinifer.com)</option>
                 </select>
               </div>

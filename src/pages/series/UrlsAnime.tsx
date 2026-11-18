@@ -17,6 +17,13 @@ import {
   DooplexAnimeVideo
 } from '../../types';
 import { SERVER_OPTIONS, LANG_OPTIONS, HEADER_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import {
+  buildDooplexSourceFlags,
+  DooplexSourceType,
+  inferSourceFromSelection,
+  normalizeServerLabel,
+  prepareRegistrationLink
+} from '../../lib/registrationUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsAnime() {
@@ -125,13 +132,12 @@ export default function UrlsAnime() {
 
   const handleEdit = (video: DooplexAnimeVideo) => {
     setEditingId(video.id);
-    const source = resolveSourceValue(video);
+    const source = resolveSourceValue(video) as DooplexSourceType;
     setEditForm({
       ...video,
-      embed: source === 'embed' ? '1' : '0',
-      youtubelink: source === 'youtubelink' ? '1' : '0',
-      hls: source === 'hls' ? '1' : '0',
-      supported_hosts: source === 'supported_hosts' ? '1' : '0'
+      server: normalizeServerLabel(video.server),
+      header: normalizeServerLabel(video.header),
+      ...buildDooplexSourceFlags(source)
     });
   };
 
@@ -144,22 +150,34 @@ export default function UrlsAnime() {
     if (!editingId || !editForm) return;
 
     try {
+      const prepared = prepareRegistrationLink({
+        url: editForm.link || '',
+        server: editForm.server || '',
+        header: editForm.header || '',
+        source: resolveSourceValue(editForm) as DooplexSourceType
+      });
+
+      const updatedFields: Partial<DooplexAnimeVideo> = {
+        ...editForm,
+        server: prepared.server,
+        header: prepared.header,
+        link: prepared.link,
+        ...prepared.sourceFlags
+      };
+
       await updateDooplexAnimeVideo({
         id: editingId,
-        link: editForm.link,
-        server: editForm.server,
-        header: editForm.header,
+        link: prepared.link,
+        server: prepared.server,
+        header: prepared.header,
         lang: editForm.lang,
-        embed: editForm.embed,
-        youtubelink: editForm.youtubelink,
-        hls: editForm.hls,
-        supported_hosts: editForm.supported_hosts
+        ...prepared.sourceFlags
       });
       
       // Update local state
       setVideosMap(prev => ({
         ...prev,
-        [episodeId]: prev[episodeId].map(v => v.id === editingId ? { ...v, ...editForm } as DooplexAnimeVideo : v)
+        [episodeId]: prev[episodeId].map(v => v.id === editingId ? { ...v, ...updatedFields } as DooplexAnimeVideo : v)
       }));
       setEditingId(null);
       showSnackbar('Video actualizado correctamente', 'success');
@@ -395,13 +413,21 @@ export default function UrlsAnime() {
                                   <div className="bg-white p-3 rounded border border-blue-200 shadow-sm grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                                     <div className="sm:col-span-2">
                                       <select
-                                        value={editForm.server}
+                                        value={editForm.server || ''}
                                         onChange={(e) => {
                                           const value = e.target.value;
-                                          setEditForm({ ...editForm, server: value, header: value });
+                                          setEditForm({
+                                            ...editForm,
+                                            server: value,
+                                            header: value,
+                                            ...buildDooplexSourceFlags(inferSourceFromSelection(value))
+                                          });
                                         }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
+                                        {editForm.server && !SERVER_OPTIONS.some(o => o.value === editForm.server) && (
+                                          <option value={editForm.server}>{editForm.server}</option>
+                                        )}
                                         {SERVER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>
@@ -410,10 +436,18 @@ export default function UrlsAnime() {
                                         value={editForm.header || ''}
                                         onChange={(e) => {
                                           const value = e.target.value;
-                                          setEditForm({ ...editForm, header: value, server: value });
+                                          setEditForm({
+                                            ...editForm,
+                                            header: value,
+                                            server: value,
+                                            ...buildDooplexSourceFlags(inferSourceFromSelection(value))
+                                          });
                                         }}
                                         className="w-full rounded border-gray-300 text-xs p-1.5"
                                       >
+                                        {editForm.header && !HEADER_OPTIONS.some(o => o.value === editForm.header) && (
+                                          <option value={editForm.header}>{editForm.header}</option>
+                                        )}
                                         {HEADER_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                       </select>
                                     </div>

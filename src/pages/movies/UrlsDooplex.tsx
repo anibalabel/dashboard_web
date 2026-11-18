@@ -10,6 +10,13 @@ import {
 } from '../../services/api';
 import { DooplexMovieVideo, DooplexMovie } from '../../types';
 import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import {
+  buildDooplexSourceFlags,
+  DooplexSourceType,
+  inferSourceFromSelection,
+  normalizeServerLabel,
+  prepareRegistrationLink
+} from '../../lib/registrationUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDooplexPeliculas() {
@@ -113,13 +120,12 @@ export default function UrlsDooplexPeliculas() {
 
   const handleEdit = (video: DooplexMovieVideo) => {
     setEditingId(video.id);
-    const source = resolveSourceValue(video);
+    const source = resolveSourceValue(video) as DooplexSourceType;
     setEditForm({
       ...video,
-      embed: source === 'embed' ? '1' : '0',
-      youtubelink: source === 'youtubelink' ? '1' : '0',
-      hls: source === 'hls' ? '1' : '0',
-      supported_hosts: source === 'supported_hosts' ? '1' : '0'
+      server: normalizeServerLabel(video.server),
+      header: normalizeServerLabel(video.header),
+      ...buildDooplexSourceFlags(source)
     });
   };
 
@@ -131,20 +137,32 @@ export default function UrlsDooplexPeliculas() {
   const handleSave = async () => {
     if (!editingId) return;
     try {
+      const prepared = prepareRegistrationLink({
+        url: editForm.link || '',
+        server: editForm.server || '',
+        header: editForm.header || '',
+        source: resolveSourceValue(editForm) as DooplexSourceType
+      });
+
+      const updatedFields: Partial<DooplexMovieVideo> = {
+        ...editForm,
+        server: prepared.server,
+        header: prepared.header,
+        link: prepared.link,
+        ...prepared.sourceFlags
+      };
+
       await updateDooplexMovieVideo({
         id: editingId,
-        server: editForm.server,
-        header: editForm.header,
-        link: editForm.link,
+        server: prepared.server,
+        header: prepared.header,
+        link: prepared.link,
         lang: editForm.lang,
-        embed: editForm.embed,
-        youtubelink: editForm.youtubelink,
-        hls: editForm.hls,
-        supported_hosts: editForm.supported_hosts
+        ...prepared.sourceFlags
       });
 
       setVideos(prev =>
-        prev.map(v => (v.id === editingId ? ({ ...v, ...editForm } as DooplexMovieVideo) : v))
+        prev.map(v => (v.id === editingId ? ({ ...v, ...updatedFields } as DooplexMovieVideo) : v))
       );
       setEditingId(null);
       setEditForm({});
@@ -304,10 +322,18 @@ export default function UrlsDooplexPeliculas() {
                               value={editForm.server || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                setEditForm({ ...editForm, server: value, header: value });
+                                setEditForm({
+                                  ...editForm,
+                                  server: value,
+                                  header: value,
+                                  ...buildDooplexSourceFlags(inferSourceFromSelection(value))
+                                });
                               }}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >
+                              {editForm.server && !SERVER_OPTIONS.some((o) => o.value === editForm.server) && (
+                                <option value={editForm.server}>{editForm.server}</option>
+                              )}
                               {SERVER_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
@@ -319,10 +345,18 @@ export default function UrlsDooplexPeliculas() {
                               value={editForm.header || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                setEditForm({ ...editForm, header: value, server: value });
+                                setEditForm({
+                                  ...editForm,
+                                  header: value,
+                                  server: value,
+                                  ...buildDooplexSourceFlags(inferSourceFromSelection(value))
+                                });
                               }}
                               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                             >
+                              {editForm.header && !HEADER_OPTIONS.some((o) => o.value === editForm.header) && (
+                                <option value={editForm.header}>{editForm.header}</option>
+                              )}
                               {HEADER_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}

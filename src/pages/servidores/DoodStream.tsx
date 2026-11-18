@@ -70,11 +70,11 @@ export default function DoodStream() {
   };
 
   const handleCopyUrl = async (fileCode: string) => {
-    const doodUrl = `https://dood.to/e/${fileCode}`;
+    const doodUrl = `https://playmogo.com/e/${fileCode}`;
     const ok = await copyToClipboard(doodUrl);
     if (ok) {
       setCopiedKey(`file-${fileCode}`);
-      showNotification('Enlace copiado (https://dood.to/e/...)');
+      showNotification('Enlace copiado (https://playmogo.com/e/...)');
       setTimeout(() => {
         setCopiedKey(prev => (prev === `file-${fileCode}` ? null : prev));
       }, 2000);
@@ -393,7 +393,7 @@ export default function DoodStream() {
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'hover:bg-blue-50 text-gray-600 hover:text-blue-600'
                         }`}
-                        title="Copiar enlace https://dood.to/e/..."
+                        title="Copiar enlace https://playmogo.com/e/..."
                       >
                         {copiedKey === `file-${file.file_code}` ? (
                           <Check className="h-3.5 w-3.5 text-emerald-600" />

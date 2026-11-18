@@ -151,17 +151,17 @@ export function subscribeEarnvidsConfig(callback: (baseUrl: string) => void): ()
 }
 
 /**
- * Comprueba si un servidor o URL corresponde a EarnVids o sus variantes conocidas (smoothpre, earnvid, etc.).
+ * Comprueba si un servidor o URL corresponde a EarnVids / VidHide o sus variantes conocidas (smoothpre, earnvid, vidhidepro, etc.).
  */
 export function isEarnvidsUrlOrServer(url?: string | null, serverName?: string): boolean {
-  if (serverName && /(?:earnvids|earnvid|smoothpre|smoothplay|smooth)/i.test(serverName)) {
+  if (serverName && /(?:earnvids|earnvid|smoothpre|smoothplay|smooth|vidhide)/i.test(serverName)) {
     return true;
   }
 
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
 
-  return /(?:earnvids\.[a-z0-9]+|earnvid\.[a-z0-9]+|smoothpre\.[a-z0-9]+|smoothplay\.[a-z0-9]+)/i.test(trimmed);
+  return /(?:earnvids\.[a-z0-9-]+|earnvid\.[a-z0-9-]+|smoothpre\.[a-z0-9-]+|smoothplay\.[a-z0-9-]+|vidhide[a-z0-9-]*\.[a-z0-9-]+|dhtpre\.[a-z0-9-]+|peytonepre\.[a-z0-9-]+|movearnpre\.[a-z0-9-]+|mivalyo\.[a-z0-9-]+)/i.test(trimmed);
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 } from '../../services/api';
 import { DocinesEpisode, DocinesSeason, DocinesSerie, DocinesVideoLink } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS } from '../../lib/constants';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDocines() {
@@ -156,16 +157,17 @@ export default function UrlsDocines() {
   const handleSave = async (episodeId: number) => {
     if (!editingId) return;
     try {
+      const normalizedUrl = formatDoodstreamUrl(editForm.url || '', editForm.name);
       await updateDocinesVideo({
         id: editingId,
         name: editForm.name,
-        url: editForm.url,
+        url: normalizedUrl,
         quality: editForm.quality
       });
 
       setVideosMap(prev => ({
         ...prev,
-        [episodeId]: prev[episodeId].map(v => (v.id === editingId ? ({ ...v, ...editForm } as DocinesVideoLink) : v))
+        [episodeId]: prev[episodeId].map(v => (v.id === editingId ? ({ ...v, ...editForm, url: normalizedUrl } as DocinesVideoLink) : v))
       }));
       setEditingId(null);
       setEditForm({});

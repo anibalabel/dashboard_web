@@ -167,7 +167,7 @@ export default function ScraperMoviesCinemitas() {
            const lower = urlOrText.toLowerCase();
            if (target === 'uqload') return lower.includes('uqload');
            if (target === 'vidara') return lower.includes('vidara');
-           if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse');
+           if (target === 'byse') return lower.includes('bysezoxexe') || lower.includes('byse') || lower.includes('filemoon');
            if (target === 'audinifer') return lower.includes('audinifer');
            if (target === 'earnvids' || target === 'smoothpre') return lower.includes('earnvids') || lower.includes('earnvid') || lower.includes('smoothpre');
            return lower.includes(target.toLowerCase());
@@ -194,7 +194,7 @@ export default function ScraperMoviesCinemitas() {
               let cleanUrl = iframeMatch[1].replace(/\\/g, '').replace(/["']/g, '').trim();
               if (cleanUrl.startsWith('//')) cleanUrl = 'https:' + cleanUrl;
               if (serverFilter === 'TODOS') {
-                 if (/(?:uqload|vidara|bysezoxexe|audinifer|earnvids|smoothpre)/i.test(cleanUrl) || /^https?:\/\//i.test(cleanUrl)) {
+                 if (/(?:uqload|vidara|bysezoxexe|byse|filemoon|audinifer|earnvids|smoothpre)/i.test(cleanUrl) || /^https?:\/\//i.test(cleanUrl)) {
                     return cleanUrl;
                  }
               } else if (matchServer(cleanUrl, serverFilter)) {
@@ -209,13 +209,13 @@ export default function ScraperMoviesCinemitas() {
            } else if (serverFilter === 'vidara') {
               regex = /https?:\/\/[^\s"'<>]*vidara[^\s"'<>]*/gi;
            } else if (serverFilter === 'byse') {
-              regex = /https?:\/\/[^\s"'<>]*byse[^\s"'<>]*/gi;
+              regex = /https?:\/\/[^\s"'<>]*(?:bysezoxexe|byse|filemoon)[^\s"'<>]*/gi;
            } else if (serverFilter === 'audinifer') {
               regex = /https?:\/\/[^\s"'<>]*audinifer[^\s"'<>]*/gi;
            } else if (serverFilter === 'earnvids' || serverFilter === 'smoothpre') {
               regex = /https?:\/\/[^\s"'<>]*(?:earnvids|smoothpre)[^\s"'<>]*/gi;
            } else {
-              regex = /https?:\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|audinifer|earnvids|smoothpre)[^\s"'<>]*/gi;
+              regex = /https?:\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|byse|filemoon|audinifer|earnvids|smoothpre)[^\s"'<>]*/gi;
            }
 
            const matches = text.match(regex);
@@ -228,7 +228,7 @@ export default function ScraperMoviesCinemitas() {
            // 3. Comprobación si el texto limpio es directamente la URL
            const trimmed = text.replace(/\\/g, '').replace(/["']/g, '').trim();
            if (serverFilter === 'TODOS') {
-              if (/^(?:https?:)?\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|audinifer|earnvids|smoothpre)/i.test(trimmed)) {
+              if (/^(?:https?:)?\/\/[^\s"'<>]*(?:uqload|vidara|bysezoxexe|byse|filemoon|audinifer|earnvids|smoothpre)/i.test(trimmed)) {
                  return trimmed.startsWith('//') ? 'https:' + trimmed : trimmed;
               }
            } else {
@@ -422,7 +422,7 @@ export default function ScraperMoviesCinemitas() {
                   <option value="earnvids">EarnVids (smoothpre.com)</option>
                   <option value="uqload">Uqload</option>
                   <option value="vidara">Vidara (vidara.so)</option>
-                  <option value="byse">Byse (bysezoxexe.com)</option>
+                  <option value="byse">FileMoon / Bysekoze (bysekoze.com)</option>
                   <option value="audinifer">Audinifer (audinifer.com)</option>
                 </select>
               </div>

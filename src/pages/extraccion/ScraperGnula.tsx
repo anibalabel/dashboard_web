@@ -436,7 +436,7 @@ export default function ScraperGnula() {
                     onChange={(e) => setServerType(e.target.value as 'bysevepoin' | 'voe' | 'vidsonic' | 'rpmplay' | 'p2pplay' | 'okru')}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                   >
-                    <option value="bysevepoin">Filemoon (bysevepoin)</option>
+                    <option value="bysevepoin">FileMoon / Bysekoze (bysevepoin)</option>
                     <option value="vidsonic">vidsonic.net</option>
                     <option value="rpmplay">dtpg.rpmplay.xyz</option>
                     <option value="p2pplay">gdtvid.p2pplay.pro</option>

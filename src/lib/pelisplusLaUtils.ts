@@ -1,10 +1,4 @@
-import {
-  formatDoodstreamUrl,
-  isEarnvidsUrlOrServer,
-  isStreamwishUrlOrServer,
-} from './doodstreamUtils';
-import { extractEarnvidsVideoId } from './earnvidsUtils';
-import { getVidaraUrl } from './vidaraUtils';
+import { formatDoodstreamUrl } from './doodstreamUtils';
 import { getProxyUrl } from './proxy';
 import { isEmbed69BotChallenge } from './embed69Utils';
 
@@ -49,14 +43,17 @@ export interface PelisplusLaParsedSeries {
 
 export const PELISPLUS_LA_PRESET_SERVERS = [
   { value: 'all', label: 'Todos los servidores' },
-  { value: 'voe', label: 'VOE (voesx)' },
-  { value: 'streamwish', label: 'StreamWish' },
-  { value: 'vidhide', label: 'Vidhide (smoothpre)' },
+  { value: 'voe', label: 'VOE (voe.sx)' },
+  { value: 'streamwish', label: 'StreamWish (streamwish.fun)' },
+  { value: 'vidhide', label: 'VidHide / EarnVids (smoothpre)' },
   { value: 'vidara', label: 'Vidara (vidara.so)' },
+  { value: 'mixdrop', label: 'MixDrop (mixdrop.ps)' },
+  { value: 'filemoon', label: 'FileMoon / Bysekoze' },
   { value: 'filelions', label: 'Filelions' },
   { value: 'streamtape', label: 'Streamtape' },
   { value: 'uqload', label: 'Uqload (uqload.vc)' },
   { value: 'doodstream', label: 'Doodstream (playmogo)' },
+  { value: 'youtube', label: 'YouTube' },
 ] as const;
 
 const PRESET_SERVER_VALUES = new Set<string>(
@@ -71,6 +68,8 @@ export function normalizePelisplusLaServerFilter(serverName: string): string {
   const low = trimmed.toLowerCase();
   if (low === 'voesx') return 'voe';
   if (low === 'dofast' || low === 'dood' || low === 'playmogo') return 'doodstream';
+  if (low === 'filemoon' || low.includes('byse')) return 'filemoon';
+  if (low === 'youtu.be' || low === 'youtube') return 'youtube';
   return trimmed;
 }
 
@@ -261,100 +260,11 @@ function resolveEmbedUrl(rawUrl: string, baseUrl?: string): string {
   return cleaned;
 }
 
-function getUrlHostname(targetUrl: string): string {
-  try {
-    const normalized = targetUrl.startsWith('//')
-      ? `https:${targetUrl}`
-      : /^https?:\/\//i.test(targetUrl)
-        ? targetUrl
-        : `https://${targetUrl}`;
-    return new URL(normalized).hostname.toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-function replaceUrlHost(targetUrl: string, newHost: string): string {
-  try {
-    const normalized = targetUrl.startsWith('//')
-      ? `https:${targetUrl}`
-      : /^https?:\/\//i.test(targetUrl)
-        ? targetUrl
-        : `https://${targetUrl}`;
-    const parsed = new URL(normalized);
-    parsed.protocol = 'https:';
-    parsed.host = newHost;
-    return parsed.toString();
-  } catch {
-    return targetUrl.replace(/^(?:https?:)?\/\/[^/]+/i, `https://${newHost}`);
-  }
-}
-
-function rewriteWatchUrlWithId(
-  rawUrl: string,
-  fallbackFormattedUrl: string,
-  targetHost: string,
-  buildWatchUrl: (videoId: string) => string
-): string {
-  const videoId = extractEarnvidsVideoId(rawUrl);
-  return videoId ? buildWatchUrl(videoId) : replaceUrlHost(fallbackFormattedUrl, targetHost);
-}
-
 /**
- * Formats an extracted PelisplusHD.la option URL:
- * - Uqload links are rewritten to https://uqload.vc
- * - Doodstream links are normalized to https://playmogo.com/e/VIDEO_ID
- * - Vidhide links are normalized to https://smoothpre.com/v/VIDEO_ID
- * - Vidara links are normalized to https://vidara.so/v/VIDEO_ID
- * - Other servers keep standard formatDoodstreamUrl normalization
+ * Formats an extracted PelisplusHD.la option URL using canonical server rules.
  */
 export function formatPelisplusLaOptionUrl(rawUrl: string, serverName?: string): string {
-  const formatted = formatDoodstreamUrl(rawUrl, serverName);
-  if (!formatted) return '';
-
-  const hostname = getUrlHostname(rawUrl) || getUrlHostname(formatted);
-  const isUqload =
-    Boolean(serverName && /uqload/i.test(serverName)) ||
-    /(?:^|\.)uqload\.[a-z0-9-]+$/i.test(hostname);
-  if (isUqload) {
-    return replaceUrlHost(formatted, 'uqload.vc');
-  }
-
-  const isVidhide =
-    Boolean(serverName && /vidhide/i.test(serverName)) ||
-    /(?:^|\.)vidhide[a-z0-9-]*\.[a-z0-9-]+$/i.test(hostname);
-  if (isVidhide) {
-    return rewriteWatchUrlWithId(
-      rawUrl,
-      formatted,
-      'smoothpre.com',
-      (videoId) => `https://smoothpre.com/v/${videoId}`
-    );
-  }
-
-  const isVidara =
-    Boolean(serverName && /vidara/i.test(serverName)) ||
-    /(?:^|\.)vidara\.[a-z0-9-]+$/i.test(hostname);
-  if (isVidara) {
-    return rewriteWatchUrlWithId(rawUrl, formatted, 'vidara.so', (videoId) =>
-      getVidaraUrl(videoId, 'watch')
-    );
-  }
-
-  const isDoodstream =
-    !isStreamwishUrlOrServer(rawUrl, serverName) &&
-    !isEarnvidsUrlOrServer(rawUrl, serverName) &&
-    (Boolean(serverName && /(?:dood|dofast)/i.test(serverName)) ||
-      /(?:^|\.)(?:dood(?:stream|s|cdn)?|d0o0d|doood(?:ster)?|ds2play|doply|playmogo|myvidstream)\.[a-z0-9-]+$/i.test(
-        hostname
-      ));
-  if (isDoodstream) {
-    // Normalize path to /e/VIDEO_ID first, then swap dood.to/legacy hosts to playmogo.com
-    const doodNormalized = formatDoodstreamUrl(rawUrl, 'doodstream');
-    return replaceUrlHost(doodNormalized, 'playmogo.com');
-  }
-
-  return formatted;
+  return formatDoodstreamUrl(rawUrl, serverName);
 }
 
 function inferServerName(rawLabel: string, embedUrl: string): string {
@@ -365,16 +275,19 @@ function inferServerName(rawLabel: string, embedUrl: string): string {
 
   try {
     const hostname = new URL(embedUrl).hostname.toLowerCase().replace(/^www\./, '');
-    if (/(?:streamwish|embedwish|wishembed|awish|mwish|swishsrv|filelions)/.test(hostname)) {
+    if (/(?:streamwish|embedwish|wishembed|awish|mwish|swishsrv|hgcloud)/.test(hostname)) {
       return 'streamwish';
     }
+    if (/filelions/.test(hostname)) return 'filelions';
+    if (/(?:filemoon|byse|fmoon|moonplayer)/.test(hostname)) return 'filemoon';
     if (/vidhide/.test(hostname)) return 'vidhide';
     if (/vidara/.test(hostname)) return 'vidara';
     if (/uqload/.test(hostname)) return 'uqload';
     if (/(?:dood|ds2play|playmogo|d0o0d|doood|myvidstream)/.test(hostname)) return 'doodstream';
-    if (/(?:earnvids|earnvid|smoothpre)/.test(hostname)) return 'earnvids';
-    if (/mixdrop/.test(hostname)) return 'mixdrop';
+    if (/(?:earnvids|earnvid|smoothpre|dhtpre|peytonepre|movearnpre|mivalyo)/.test(hostname)) return 'earnvids';
+    if (/(?:mixdrop|mxdrop|m1xdrop)/.test(hostname)) return 'mixdrop';
     if (/voe/.test(hostname)) return 'voe';
+    if (/(?:youtube\.com|youtu\.be)/.test(hostname)) return 'youtube';
     return hostname;
   } catch {
     return label || 'servidor';
@@ -443,7 +356,13 @@ export function matchesPelisplusLaServer(option: PelisplusLaOption, targetServer
   }
 
   if (target === 'vidhide') {
-    return srv.includes('vidhide') || raw.includes('vidhide') || formatted.includes('vidhide');
+    return (
+      srv.includes('vidhide') ||
+      srv.includes('earnvids') ||
+      srv.includes('smoothpre') ||
+      /(?:vidhide|earnvids|earnvid|smoothpre|dhtpre|peytonepre|movearnpre|mivalyo)/.test(raw) ||
+      /(?:vidhide|earnvids|earnvid|smoothpre|dhtpre|peytonepre|movearnpre|mivalyo)/.test(formatted)
+    );
   }
 
   if (target === 'vidara') {
@@ -452,6 +371,31 @@ export function matchesPelisplusLaServer(option: PelisplusLaOption, targetServer
 
   if (target === 'voe' || target === 'voesx') {
     return srv.includes('voe') || raw.includes('voe') || formatted.includes('voe');
+  }
+
+  if (target === 'mixdrop') {
+    return (
+      srv.includes('mixdrop') ||
+      /(?:mixdrop|mxdrop|m1xdrop)/.test(raw) ||
+      /(?:mixdrop|mxdrop|m1xdrop)/.test(formatted)
+    );
+  }
+
+  if (target === 'filemoon' || target.includes('byse')) {
+    return (
+      srv.includes('filemoon') ||
+      srv.includes('byse') ||
+      /(?:filemoon|byse|fmoon|moonplayer)/.test(raw) ||
+      /(?:filemoon|byse|fmoon|moonplayer)/.test(formatted)
+    );
+  }
+
+  if (target === 'youtube' || target === 'youtu.be') {
+    return (
+      srv.includes('youtube') ||
+      /(?:youtube\.com|youtu\.be)/.test(raw) ||
+      /(?:youtube\.com|youtu\.be)/.test(formatted)
+    );
   }
 
   if (target === 'filelions') {

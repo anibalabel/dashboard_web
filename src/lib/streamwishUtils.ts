@@ -158,14 +158,14 @@ export function subscribeStreamwishConfig(callback: (baseUrl: string) => void): 
  * Comprueba si un servidor o URL corresponde a Streamwish o sus variantes conocidas.
  */
 export function isStreamwishUrlOrServer(url?: string | null, serverName?: string): boolean {
-  if (serverName && /(?:streamwish|embedwish|wishembed|awish|mwish|swishsrv|swish|wish)/i.test(serverName)) {
+  if (serverName && /(?:streamwish|embedwish|wishembed|awish|mwish|swishsrv|swish|wish|streawhist)/i.test(serverName)) {
     return true;
   }
 
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
 
-  return /(?:streamwish\.[a-z0-9]+|embedwish\.[a-z0-9]+|wishembed\.[a-z0-9]+|awish\.[a-z0-9]+|mwish\.[a-z0-9]+|swishsrv\.[a-z0-9]+|filelions\.[a-z0-9]+)/i.test(trimmed);
+  return /(?:streamwish\.[a-z0-9-]+|embedwish\.[a-z0-9-]+|wishembed\.[a-z0-9-]+|awish\.[a-z0-9-]+|mwish\.[a-z0-9-]+|swishsrv\.[a-z0-9-]+|filelions\.[a-z0-9-]+|hgcloud\.[a-z0-9-]+)/i.test(trimmed);
 }
 
 /**

@@ -21,6 +21,12 @@ import {
   PlusmovieSeason
 } from '../../types';
 import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
+import {
+  DooplexSourceType,
+  inferSourceFromSelection,
+  prepareRegistrationLink
+} from '../../lib/registrationUtils';
 
 export default function RegistroDoble() {
   const location = useLocation();
@@ -269,20 +275,20 @@ export default function RegistroDoble() {
 
       if (!isPlusmovieOnly) {
         try {
-          const sourceFlags = {
-            embed: dooplexSource === 'embed' ? '1' : '0',
-            youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
-            hls: dooplexSource === 'hls' ? '1' : '0',
-            supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
-          };
+          const prepared = prepareRegistrationLink({
+            url: currentUrl,
+            server: dooplexQuality,
+            header: dooplexHeader,
+            source: dooplexSource as DooplexSourceType
+          });
 
           await registerDooplexLink({
             episode_id: currentEpisode.id,
-            server: dooplexQuality,
-            header: dooplexHeader,
-            link: currentUrl,
+            server: prepared.server,
+            header: prepared.header,
+            link: prepared.link,
             lang: dooplexLang,
-            ...sourceFlags
+            ...prepared.sourceFlags
           });
           setProgress(prev => ({
             ...prev,
@@ -298,13 +304,14 @@ export default function RegistroDoble() {
 
       // Plusmovie Registration
       try {
+        const normalizedPlusUrl = formatDoodstreamUrl(currentUrl, isPlusmovieOnly ? undefined : dooplexHeader);
         await registerPlusmovieEpisode({
           videos_id: plusmovieSeries.videos_id,
           seasons_id: Number(selectedPlusmovieSeason),
           episodes_name: `${currentEpisode.episode_number} - ${currentEpisode.name?.trim() || `Episodio ${currentEpisode.episode_number}`}`,
           file_source: "embed",
           source_type: "link",
-          file_url: currentUrl,
+          file_url: normalizedPlusUrl,
           order: currentEpisode.episode_number
         });
         setProgress(prev => ({
@@ -503,6 +510,7 @@ export default function RegistroDoble() {
                         const val = e.target.value;
                         setDooplexQuality(val);
                         setDooplexHeader(val);
+                        setDooplexSource(inferSourceFromSelection(val));
                       }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
@@ -519,6 +527,7 @@ export default function RegistroDoble() {
                         const val = e.target.value;
                         setDooplexHeader(val);
                         setDooplexQuality(val);
+                        setDooplexSource(inferSourceFromSelection(val));
                       }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >

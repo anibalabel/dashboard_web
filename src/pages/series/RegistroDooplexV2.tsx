@@ -11,6 +11,14 @@ import {
   DooplexSeason,
   DooplexEpisode
 } from '../../types';
+import {
+  buildDooplexSourceFlags,
+  getDooplexSourceBadgeLabel,
+  isV2LanguageExcluded,
+  isV2ServerExcluded,
+  parseBulkEpisodesV2Text,
+  ParsedV2EpisodeGroup
+} from '../../lib/registrationUtils';
 
 const DEFAULT_EXCLUDED_SERVERS = ['doodstream', 'waaw', 'dsvplay'];
 const STORAGE_KEY_EXCLUDED = 'dooplex_v2_excluded_servers';
@@ -22,183 +30,6 @@ const STANDARD_LANGS: { code: 'LAT' | 'CAST' | 'SUB'; label: string }[] = [
   { code: 'CAST', label: 'CAST (Castellano)' },
   { code: 'SUB', label: 'SUB (Subtitulado)' }
 ];
-
-interface ParsedLinkItem {
-  episodeNumber: number | null;
-  server: string; // Calidad (Server), ej: "1080p HD"
-  lang: 'CAST' | 'LAT' | 'SUB';
-  rawLang: string;
-  header: string; // Ej: "Voe", "filemoon", "vidmoly", "Vidara"
-  link: string;
-  source: 'embed' | 'supported_hosts';
-}
-
-interface ParsedEpisodeGroup {
-  episodeNumber: number | null;
-  title: string;
-  items: ParsedLinkItem[];
-}
-
-interface ParseResult {
-  groups: ParsedEpisodeGroup[];
-  detectedServers: string[];
-  detectedLangs: ('CAST' | 'LAT' | 'SUB')[];
-  discardedCount: number;
-}
-
-function mapLanguage(rawLang: string): 'CAST' | 'LAT' | 'SUB' {
-  const normalized = rawLang.trim().toLowerCase();
-  if (
-    normalized.includes('españa') ||
-    normalized.includes('espana') ||
-    normalized.includes('castellano') ||
-    normalized === 'cast'
-  ) {
-    return 'CAST';
-  }
-  if (normalized.includes('subtitulado') || normalized.includes('sub') || normalized.includes('vose')) {
-    return 'SUB';
-  }
-  if (normalized.includes('latino') || normalized === 'lat') {
-    return 'LAT';
-  }
-  return 'LAT';
-}
-
-function mapSource(header: string, link: string): 'embed' | 'supported_hosts' {
-  const h = header.trim().toLowerCase();
-  const l = link.trim().toLowerCase();
-  if (h.includes('vidara') || h.includes('virda') || l.includes('vidara')) {
-    return 'supported_hosts';
-  }
-  return 'embed';
-}
-
-function isServerExcluded(header: string, link: string, excludedServers: string[]): boolean {
-  const h = header.trim().toLowerCase();
-  const l = link.trim().toLowerCase();
-  return excludedServers.some((ex) => {
-    const keyword = ex.trim().toLowerCase();
-    if (!keyword) return false;
-    return h === keyword || h.includes(keyword) || l.includes(keyword);
-  });
-}
-
-function isLanguageExcluded(lang: 'CAST' | 'LAT' | 'SUB', rawLang: string, excludedLangs: string[]): boolean {
-  const normLang = lang.trim().toLowerCase();
-  const normRaw = rawLang.trim().toLowerCase();
-  return excludedLangs.some((ex) => {
-    const keyword = ex.trim().toLowerCase();
-    if (!keyword) return false;
-    if (keyword === normLang || keyword === normRaw || normRaw.includes(keyword)) {
-      return true;
-    }
-    if (
-      (keyword === 'castellano' || keyword === 'español españa' || keyword === 'espana' || keyword === 'españa') &&
-      lang === 'CAST'
-    ) {
-      return true;
-    }
-    if ((keyword === 'latino' || keyword === 'español latino') && lang === 'LAT') {
-      return true;
-    }
-    if ((keyword === 'subtitulado' || keyword === 'vose') && lang === 'SUB') {
-      return true;
-    }
-    return false;
-  });
-}
-
-function parseEpisodesText(
-  rawText: string,
-  skipDuplicates: boolean,
-  excludedServers: string[],
-  excludedLangs: string[]
-): ParseResult {
-  const lines = rawText.split(/\r?\n/);
-  const groups: ParsedEpisodeGroup[] = [];
-  const detectedServersSet = new Set<string>();
-  const detectedLangsSet = new Set<'CAST' | 'LAT' | 'SUB'>();
-  let currentGroup: ParsedEpisodeGroup | null = null;
-  let discardedCount = 0;
-
-  const episodeHeaderRegex = /^\s*EPISODIO\s+(\d+)(.*)$/i;
-  const linkLineRegex = /^\s*(?:[•*-]\s*)?\[([^\]]+)\]\s*\[([^\]]+)\]\s*(.+?)\s*->\s*(https?:\/\/\S+)/i;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    const epMatch = line.match(episodeHeaderRegex);
-    if (epMatch) {
-      const epNum = Number(epMatch[1]);
-      currentGroup = {
-        episodeNumber: epNum,
-        title: line,
-        items: []
-      };
-      groups.push(currentGroup);
-      continue;
-    }
-
-    const linkMatch = line.match(linkLineRegex);
-    if (linkMatch) {
-      const server = linkMatch[1].trim();
-      const rawLang = linkMatch[2].trim();
-      const header = linkMatch[3].trim();
-      const link = linkMatch[4].trim();
-      const lang = mapLanguage(rawLang);
-      const source = mapSource(header, link);
-
-      detectedServersSet.add(header);
-      detectedLangsSet.add(lang);
-
-      if (
-        isServerExcluded(header, link, excludedServers) ||
-        isLanguageExcluded(lang, rawLang, excludedLangs)
-      ) {
-        discardedCount++;
-        continue;
-      }
-
-      if (!currentGroup) {
-        currentGroup = {
-          episodeNumber: null,
-          title: 'Episodio Inicial Seleccionado',
-          items: []
-        };
-        groups.push(currentGroup);
-      }
-
-      if (skipDuplicates) {
-        const exists = currentGroup.items.some(
-          (item) =>
-            item.link === link &&
-            item.lang === lang &&
-            item.header.toLowerCase() === header.toLowerCase()
-        );
-        if (exists) continue;
-      }
-
-      currentGroup.items.push({
-        episodeNumber: currentGroup.episodeNumber,
-        server,
-        lang,
-        rawLang,
-        header,
-        link,
-        source
-      });
-    }
-  }
-
-  return {
-    groups: groups.filter((g) => g.items.length > 0),
-    detectedServers: Array.from(detectedServersSet),
-    detectedLangs: Array.from(detectedLangsSet),
-    discardedCount
-  };
-}
 
 export default function RegistroDooplexV2() {
   const [tmdbId, setTmdbId] = useState('');
@@ -334,11 +165,11 @@ export default function RegistroDooplexV2() {
   };
 
   const handleToggleLang = (langCode: 'CAST' | 'LAT' | 'SUB') => {
-    const isCurrentlyExcluded = isLanguageExcluded(langCode, langCode, excludedLangs);
+    const isCurrentlyExcluded = isV2LanguageExcluded(langCode, langCode, excludedLangs);
 
     if (isCurrentlyExcluded) {
       setExcludedLangs((prev) =>
-        prev.filter((ex) => !isLanguageExcluded(langCode, langCode, [ex]))
+        prev.filter((ex) => !isV2LanguageExcluded(langCode, langCode, [ex]))
       );
     } else {
       setExcludedLangs((prev) => [...prev, langCode]);
@@ -362,7 +193,7 @@ export default function RegistroDooplexV2() {
   });
 
   const { groups: parsedGroups, detectedServers, detectedLangs, discardedCount } = useMemo(
-    () => parseEpisodesText(urls, skipDuplicates, excludedServers, excludedLangs),
+    () => parseBulkEpisodesV2Text(urls, skipDuplicates, excludedServers, excludedLangs),
     [urls, skipDuplicates, excludedServers, excludedLangs]
   );
 
@@ -430,7 +261,7 @@ export default function RegistroDooplexV2() {
   }, [selectedDooplexSeason]);
 
   const resolveDooplexEpisode = (
-    group: ParsedEpisodeGroup,
+    group: ParsedV2EpisodeGroup,
     groupIndex: number,
     startIndex: number
   ): DooplexEpisode | undefined => {
@@ -494,12 +325,7 @@ export default function RegistroDooplexV2() {
       }
 
       for (const item of group.items) {
-        const sourceFlags = {
-          embed: item.source === 'embed' ? '1' : '0',
-          youtubelink: '0',
-          hls: '0',
-          supported_hosts: item.source === 'supported_hosts' ? '1' : '0'
-        };
+        const sourceFlags = buildDooplexSourceFlags(item.source);
 
         try {
           await registerDooplexLink({
@@ -515,9 +341,7 @@ export default function RegistroDooplexV2() {
             ...prev,
             logs: [
               {
-                msg: `[Ep ${targetEpisode.episode_number}] OK -> [${item.server}] [${item.lang}] ${item.header} (${
-                  item.source === 'supported_hosts' ? 'SUPPORTED HOST' : 'EMBED'
-                })`,
+                msg: `[Ep ${targetEpisode.episode_number}] OK -> [${item.server}] [${item.lang}] ${item.header} (${getDooplexSourceBadgeLabel(item.source)})`,
                 isError: false
               },
               ...prev.logs
@@ -719,7 +543,7 @@ export default function RegistroDooplexV2() {
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {detectedServers.map((srv) => {
-                      const isEx = isServerExcluded(srv, '', excludedServers);
+                      const isEx = isV2ServerExcluded(srv, '', excludedServers);
                       return (
                         <button
                           key={srv}
@@ -765,7 +589,7 @@ export default function RegistroDooplexV2() {
                 {/* Quick Toggle Buttons for Standard Languages */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {STANDARD_LANGS.map(({ code, label }) => {
-                    const isEx = isLanguageExcluded(code, code, excludedLangs);
+                    const isEx = isV2LanguageExcluded(code, code, excludedLangs);
                     const isDetected = detectedLangs.includes(code);
                     return (
                       <button
@@ -915,10 +739,14 @@ export default function RegistroDooplexV2() {
                                 className={`px-1.5 py-0.5 rounded font-semibold ${
                                   item.source === 'supported_hosts'
                                     ? 'bg-emerald-50 text-emerald-700'
+                                    : item.source === 'youtubelink'
+                                    ? 'bg-red-50 text-red-700'
+                                    : item.source === 'hls'
+                                    ? 'bg-amber-50 text-amber-700'
                                     : 'bg-gray-100 text-gray-600'
                                 }`}
                               >
-                                {item.source === 'supported_hosts' ? 'SUPPORTED HOST' : 'EMBED'}
+                                {getDooplexSourceBadgeLabel(item.source)}
                               </span>
                               <span className="truncate flex-1 text-gray-400">{item.link}</span>
                             </div>
@@ -952,7 +780,7 @@ export default function RegistroDooplexV2() {
                 value={urls}
                 onChange={(e) => setUrls(e.target.value)}
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 font-mono text-xs"
-                placeholder={`--------------------------------------------------------------------\nEPISODIO 1 [T1·E1] - Capítulo 1\n--------------------------------------------------------------------\n  • [1080p HD] [Español España] Voe -> https://voe.sx/e/bjvd6oxwbz4k\n  • [1080p HD] [Subtitulado] filemoon -> https://byseqekaho.com/e/6wbosve3hlry`}
+                placeholder={`--------------------------------------------------------------------\nEPISODIO 1 [T1·E1] - Capítulo 1\n--------------------------------------------------------------------\n  • [1080p HD] [Español España] Voe -> https://voe.sx/e/bjvd6oxwbz4k\n  • [1080p HD] [Subtitulado] FileMoon / Bysekoze -> https://bysekoze.com/e/6wbosve3hlry`}
               ></textarea>
 
               <button

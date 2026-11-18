@@ -255,7 +255,7 @@ export default function ScraperMoviesGnula() {
                     onChange={(e) => setServerType(e.target.value)}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                   >
-                    <option value="bysevepoin">Filemoon (bysevepoin)</option>
+                    <option value="bysevepoin">FileMoon / Bysekoze (bysevepoin)</option>
                     <option value="voe">VOE (voe)</option>
                   </select>
                 </div>

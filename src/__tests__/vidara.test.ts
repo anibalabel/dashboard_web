@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseVidaraBatchInput, getVidaraUrl, DEFAULT_VIDARA_API_KEY } from '../lib/vidaraUtils';
+import {
+  parseVidaraBatchInput,
+  getVidaraUrl,
+  DEFAULT_VIDARA_API_KEY,
+  isVidaraUrlOrServer,
+  extractVidaraVideoId,
+  formatVidaraUrl
+} from '../lib/vidaraUtils';
 
 describe('Vidara Utils & Parser', () => {
   it('should have default API key configured', () => {
@@ -54,5 +61,17 @@ https://example.com/sample.mp4 | Sample Title`;
     expect(result.items[0].title).toBe('');
     expect(result.items[1].url).toBe('https://example.com/sample.mp4');
     expect(result.items[1].title).toBe('Sample Title');
+  });
+
+  it('should detect, extract ID, and normalize Vidara links to https://vidara.so/v/VIDEO_ID', () => {
+    expect(isVidaraUrlOrServer('https://vidara.to/e/4Y2q4yZDtxGWw')).toBe(true);
+    expect(isVidaraUrlOrServer('https://custom.domain/e/4Y2q4yZDtxGWw', 'virda')).toBe(true);
+    expect(isVidaraUrlOrServer('https://voe.sx/e/abc123', 'voe')).toBe(false);
+
+    expect(extractVidaraVideoId('https://vidara.to/e/4Y2q4yZDtxGWw?autoplay=1')).toBe('4Y2q4yZDtxGWw');
+    expect(extractVidaraVideoId('https://vidara.so/4Y2q4yZDtxGWw.html')).toBe('4Y2q4yZDtxGWw');
+
+    expect(formatVidaraUrl('https://vidara.to/e/4Y2q4yZDtxGWw')).toBe('https://vidara.so/v/4Y2q4yZDtxGWw');
+    expect(formatVidaraUrl('https://custom.example/embed-vr999.html', 'virda')).toBe('https://vidara.so/v/vr999');
   });
 });

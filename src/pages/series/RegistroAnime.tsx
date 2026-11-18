@@ -3,6 +3,11 @@ import { AlertCircle, CheckCircle, Loader2, PlayCircle, Search } from 'lucide-re
 import { getDooplexAnime, getDooplexAnimeEpisodes, getDooplexAnimeSeasons, registerDooplexAnimeEpisodeVideo } from '../../services/api';
 import { DooplexAnime, DooplexAnimeEpisode, DooplexAnimeSeason } from '../../types';
 import { HEADER_OPTIONS, LANG_OPTIONS, SERVER_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import {
+  DooplexSourceType,
+  inferSourceFromSelection,
+  prepareRegistrationLink
+} from '../../lib/registrationUtils';
 
 export default function RegistroAnime() {
   const [tmdbId, setTmdbId] = useState('');
@@ -156,20 +161,20 @@ export default function RegistroAnime() {
       }
 
       try {
-        const sourceFlags = {
-          embed: source === 'embed' ? '1' : '0',
-          youtubelink: source === 'youtubelink' ? '1' : '0',
-          hls: source === 'hls' ? '1' : '0',
-          supported_hosts: source === 'supported_hosts' ? '1' : '0'
-        };
+        const prepared = prepareRegistrationLink({
+          url: currentUrl,
+          server,
+          header,
+          source: source as DooplexSourceType
+        });
 
         await registerDooplexAnimeEpisodeVideo({
           anime_episode_id: currentEpisode.id,
-          server,
-          header,
-          link: currentUrl,
+          server: prepared.server,
+          header: prepared.header,
+          link: prepared.link,
           lang,
-          ...sourceFlags
+          ...prepared.sourceFlags
         });
 
         setProgress((prev) => ({
@@ -285,6 +290,7 @@ export default function RegistroAnime() {
                         const val = e.target.value;
                         setServer(val);
                         setHeader(val);
+                        setSource(inferSourceFromSelection(val));
                       }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >
@@ -304,6 +310,7 @@ export default function RegistroAnime() {
                         const val = e.target.value;
                         setHeader(val);
                         setServer(val);
+                        setSource(inferSourceFromSelection(val));
                       }}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                     >

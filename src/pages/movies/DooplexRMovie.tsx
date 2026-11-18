@@ -3,7 +3,12 @@ import { Search, Film, Loader2, CheckCircle, AlertCircle, Copy, Check, Link as L
 import { copyToClipboard } from '../../lib/clipboard';
 import { getDooplexMovie, registerDooplexMovie } from '../../services/api';
 import { DooplexMovie } from '../../types';
-import { QUALITY_OPTIONS, SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import {
+  DooplexSourceType,
+  inferSourceFromSelection,
+  prepareRegistrationLink,
+} from '../../lib/registrationUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function DooplexRMovie() {
@@ -92,28 +97,27 @@ export default function DooplexRMovie() {
     setIsRegistering(true);
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
-    const sourceFlags = {
-      embed: dooplexSource === 'embed' ? '1' : '0',
-      youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
-      hls: dooplexSource === 'hls' ? '1' : '0',
-      supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
-    };
-
     let successCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < urlList.length; i++) {
-      const currentUrl = urlList[i];
+      const rawUrl = urlList[i];
+      const prepared = prepareRegistrationLink({
+        url: rawUrl,
+        server: dooplexQuality,
+        header: dooplexHeader,
+        source: dooplexSource as DooplexSourceType,
+      });
       const logPrefix = `[URL ${i + 1}/${urlList.length}]`;
 
       try {
         await registerDooplexMovie({
           movie_id: dooplexData.id,
-          server: dooplexQuality,
-          header: dooplexHeader,
-          link: currentUrl,
+          server: prepared.server,
+          header: prepared.header,
+          link: prepared.link,
           lang: dooplexLang,
-          ...sourceFlags
+          ...prepared.sourceFlags
         });
 
         successCount++;
@@ -121,7 +125,7 @@ export default function DooplexRMovie() {
           ...prev,
           current: i + 1,
           logs: [
-            { msg: `${logPrefix} Registrado exitosamente: ${currentUrl.substring(0, 45)}...`, isError: false },
+            { msg: `${logPrefix} Registrado exitosamente: ${prepared.link.substring(0, 50)}...`, isError: false },
             ...prev.logs
           ]
         }));
@@ -131,7 +135,7 @@ export default function DooplexRMovie() {
           ...prev,
           current: i + 1,
           logs: [
-            { msg: `${logPrefix} Error al registrar: ${currentUrl.substring(0, 45)}...`, isError: true },
+            { msg: `${logPrefix} Error al registrar: ${prepared.link.substring(0, 50)}...`, isError: true },
             ...prev.logs
           ]
         }));
@@ -275,6 +279,7 @@ export default function DooplexRMovie() {
                       const val = e.target.value;
                       setDooplexQuality(val);
                       setDooplexHeader(val);
+                      setDooplexSource(inferSourceFromSelection(val));
                     }}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm"
                   >
@@ -297,6 +302,7 @@ export default function DooplexRMovie() {
                       const val = e.target.value;
                       setDooplexHeader(val);
                       setDooplexQuality(val);
+                      setDooplexSource(inferSourceFromSelection(val));
                     }}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm"
                   >
@@ -371,7 +377,7 @@ export default function DooplexRMovie() {
                   value={urls}
                   onChange={(e) => setUrls(e.target.value)}
                   className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-3 font-mono text-xs sm:text-sm resize-y"
-                  placeholder="https://server.com/embed/xyz123&#10;https://mega.nz/file/abc456&#10;https://dood.to/e/..."
+                  placeholder="https://vidara.so/v/xyz123&#10;https://bysekoze.com/e/abc456&#10;https://playmogo.com/e/..."
                   spellCheck="false"
                 />
               </div>

@@ -118,3 +118,97 @@ export function getVidaraUrl(filecode: string, type: 'watch' | 'embed' = 'watch'
   }
   return `${DEFAULT_VIDARA_WATCH_BASE}${cleanCode}`;
 }
+
+/**
+ * Comprueba si un servidor o URL corresponde a Vidara (incluyendo alias comunes como "virda").
+ */
+export function isVidaraUrlOrServer(url?: string | null, serverName?: string): boolean {
+  if (serverName && /(?:vidara|virda)/i.test(serverName)) {
+    return true;
+  }
+
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+
+  try {
+    const fullUrl = trimmed.startsWith('//')
+      ? `https:${trimmed}`
+      : /^https?:\/\//i.test(trimmed)
+        ? trimmed
+        : `https://${trimmed}`;
+    const host = new URL(fullUrl).hostname.toLowerCase();
+    return /(?:^|\.)vidara\.[a-z0-9-]+$/i.test(host);
+  } catch {
+    return /(?:^|\/\/)(?:[a-z0-9-]+\.)*vidara\.[a-z0-9-]+/i.test(trimmed);
+  }
+}
+
+/**
+ * Extrae el VIDEO_ID de un enlace de Vidara.
+ */
+export function extractVidaraVideoId(url: string | null | undefined): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const embedHyphenMatch = trimmed.match(/\/embed-([a-zA-Z0-9_-]+)(?:\.html?)?/i);
+  if (embedHyphenMatch?.[1]) {
+    return embedHyphenMatch[1];
+  }
+
+  const routeMatch = trimmed.match(/(?:\/v\/|\/e\/|\/d\/|\/f\/|\/embed\/)([a-zA-Z0-9_-]+)/i);
+  if (routeMatch?.[1]) {
+    return routeMatch[1].replace(/\.html?$/i, '');
+  }
+
+  const queryMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+  if (queryMatch?.[1]) {
+    return queryMatch[1];
+  }
+
+  const htmlMatch = trimmed.match(/\/([a-zA-Z0-9_-]{4,})\.html?(?:[?#]|$)/i);
+  if (htmlMatch?.[1]) {
+    return htmlMatch[1];
+  }
+
+  try {
+    const fullUrl = trimmed.startsWith('//')
+      ? `https:${trimmed}`
+      : /^https?:\/\//i.test(trimmed)
+        ? trimmed
+        : `https://${trimmed}`;
+    const parsed = new URL(fullUrl);
+    const segments = parsed.pathname.split('/').filter((s) => s.trim().length > 0);
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1].replace(/\.html?$/i, '');
+      if (/^[a-zA-Z0-9_-]{4,}$/.test(lastSegment)) {
+        return lastSegment;
+      }
+    }
+  } catch {
+    const lastSlashMatch = trimmed.match(/\/([a-zA-Z0-9_-]{4,})(?:\.html?)?(?:\?|#|$)/i);
+    if (lastSlashMatch?.[1]) {
+      return lastSlashMatch[1].replace(/\.html?$/i, '');
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Normaliza cualquier enlace o servidor de Vidara al formato canónico:
+ * https://vidara.so/v/VIDEO_ID
+ */
+export function formatVidaraUrl(url: string | null | undefined, serverName?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  if (!isVidaraUrlOrServer(trimmed, serverName)) {
+    return trimmed;
+  }
+
+  const videoId = extractVidaraVideoId(trimmed);
+  return videoId ? getVidaraUrl(videoId, 'watch') : trimmed;
+}

@@ -650,7 +650,7 @@ export default function ScraperPelisplusSeries() {
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 border p-2 bg-white"
                   >
                     <option value="voe">Voe</option>
-                    <option value="filemoon">Filemoon</option>
+                    <option value="filemoon">FileMoon / Bysekoze</option>
                     <option value="streamwish">Streamwish</option>
                     <option value="earnvids">EarnVids</option>
                     <option value="vidhide">Vidhide</option>

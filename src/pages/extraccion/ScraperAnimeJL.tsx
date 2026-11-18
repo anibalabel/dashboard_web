@@ -17,9 +17,12 @@ interface EpisodeLink {
 }
 
 const SERVER_MAP: Record<string, string> = {
-  'bysezoxexe': 'Byse',
+  'bysezoxexe': 'FileMoon / Bysekoze',
+  'byse': 'FileMoon / Bysekoze',
+  'filemoon': 'FileMoon / Bysekoze',
   'uqload': 'Uqload',
-  'hgcloud.to': 'StreaWhist',
+  'hgcloud.to': 'StreamWish',
+  'streamwish': 'StreamWish',
   'voe.sx': 'VOE',
   'mega.nz': 'Mega',
   'gumlet.io': 'Gumlet',
@@ -27,7 +30,10 @@ const SERVER_MAP: Record<string, string> = {
   'anime.upns.pro': 'Upns',
   'burstcloud.co': 'Burstcloud',
   'earnvids': 'EarnVids',
-  'smoothpre': 'EarnVids'
+  'smoothpre': 'EarnVids',
+  'vidara': 'Vidara',
+  'mixdrop': 'MixDrop',
+  'playmogo': 'DoodStream'
 };
 
 export default function ScraperAnimeJL() {
@@ -251,7 +257,7 @@ export default function ScraperAnimeJL() {
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-2 bg-white"
                 >
                   <option value="TODOS">Todos</option>
-                  {Object.values(SERVER_MAP).map(name => (
+                  {Array.from(new Set(Object.values(SERVER_MAP))).map(name => (
                     <option key={name} value={name.toUpperCase()}>{name}</option>
                   ))}
                 </select>

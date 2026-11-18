@@ -35,6 +35,7 @@ describe('Streamwish Utils - isStreamwishUrlOrServer', () => {
     expect(isStreamwishUrlOrServer('https://example.com/test', 'STREAMWISH')).toBe(true);
     expect(isStreamwishUrlOrServer('https://example.com/test', 'embedwish')).toBe(true);
     expect(isStreamwishUrlOrServer('https://example.com/test', 'wishembed')).toBe(true);
+    expect(isStreamwishUrlOrServer('https://example.com/test', 'StreaWhist')).toBe(true);
   });
 
   it('detecta por dominio en la URL', () => {
@@ -44,6 +45,7 @@ describe('Streamwish Utils - isStreamwishUrlOrServer', () => {
     expect(isStreamwishUrlOrServer('https://wishembed.pro/3r0ttf5nvn5w.html')).toBe(true);
     expect(isStreamwishUrlOrServer('https://awish.pro/e/3r0ttf5nvn5w')).toBe(true);
     expect(isStreamwishUrlOrServer('https://swishsrv.com/e/3r0ttf5nvn5w')).toBe(true);
+    expect(isStreamwishUrlOrServer('https://hgcloud.to/e/3r0ttf5nvn5w')).toBe(true);
   });
 
   it('no detecta otros servidores como Doodstream o Mixdrop', () => {
@@ -108,7 +110,7 @@ describe('Streamwish Formatting & doodstreamUtils Integration', () => {
   });
 
   it('mantiene la compatibilidad con Doodstream, Mixdrop y Dropload sin afectarlos', () => {
-    expect(formatDoodstreamUrl('https://doodstream.com/d/abc123456')).toBe('https://dood.to/e/abc123456');
+    expect(formatDoodstreamUrl('https://doodstream.com/d/abc123456')).toBe('https://playmogo.com/e/abc123456');
     expect(formatDoodstreamUrl('https://mixdrop.co/f/mix123456')).toBe('https://mixdrop.ps/e/mix123456');
     expect(formatDoodstreamUrl('https://dropload.io/d/drop123456')).toBe('https://dr0pstream.com/e/drop123456');
   });

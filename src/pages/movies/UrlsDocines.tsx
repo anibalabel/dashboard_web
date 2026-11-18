@@ -10,6 +10,7 @@ import {
 } from '../../services/api';
 import { DocinesMovieVideo, DocinesMovie } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS } from '../../lib/constants';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
 
 export default function UrlsDocinesPeliculas() {
@@ -116,17 +117,18 @@ export default function UrlsDocinesPeliculas() {
   const handleSave = async () => {
     if (!editingId) return;
     try {
+      const normalizedUrl = formatDoodstreamUrl(editForm.url || '', editForm.name);
       await updateDocinesMovieVideo({
         id: editingId,
         name: editForm.name,
-        url: editForm.url,
+        url: normalizedUrl,
         quality: editForm.quality,
         link_order: editForm.link_order
       });
 
       setVideos(prev =>
         prev
-          .map(v => (v.id === editingId ? ({ ...v, ...editForm } as DocinesMovieVideo) : v))
+          .map(v => (v.id === editingId ? ({ ...v, ...editForm, url: normalizedUrl } as DocinesMovieVideo) : v))
           .slice()
           .sort((a, b) => a.link_order - b.link_order)
       );

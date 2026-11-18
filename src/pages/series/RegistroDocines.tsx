@@ -12,6 +12,8 @@ import {
   DocinesEpisode
 } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
+import { normalizeServerLabel } from '../../lib/registrationUtils';
 
 export default function RegistroDocines() {
   const [tmdbId, setTmdbId] = useState('');
@@ -161,11 +163,13 @@ export default function RegistroDocines() {
       }
 
       try {
+        const normalizedHeader = normalizeServerLabel(docinesHeader);
+        const normalizedUrl = formatDoodstreamUrl(currentUrl, normalizedHeader);
         await registerDocinesLink({
           episode_id: currentEpisode.id,
           quality: docinesQuality,
-          name: docinesHeader ? `${docinesLang} - ${docinesHeader}` : docinesLang,
-          url: currentUrl
+          name: normalizedHeader ? `${docinesLang} - ${normalizedHeader}` : docinesLang,
+          url: normalizedUrl
         });
         setProgress(prev => ({
           ...prev,

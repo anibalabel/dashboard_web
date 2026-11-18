@@ -273,7 +273,7 @@ export default function Byse() {
           <div className="bg-indigo-600 p-2 rounded-lg">
             <Folder className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestor Byse</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Gestor FileMoon / Bysekoze</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -381,7 +381,7 @@ export default function Byse() {
                     <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 rounded shadow-sm backdrop-blur-sm p-1">
                       <button 
                         type="button"
-                        onClick={() => copyToClipboardHandler(`https://bysesukior.com/e/${file.file_code}`, `file-${file.file_code}`)}
+                        onClick={() => copyToClipboardHandler(`https://bysekoze.com/e/${file.file_code}`, `file-${file.file_code}`)}
                         className={`p-1.5 rounded transition-colors ${
                           copiedKey === `file-${file.file_code}`
                             ? 'bg-emerald-100 text-emerald-700'

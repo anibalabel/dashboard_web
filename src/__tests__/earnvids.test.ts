@@ -36,6 +36,7 @@ describe('EarnVids Utils - isEarnvidsUrlOrServer', () => {
     expect(isEarnvidsUrlOrServer('https://example.com/test', 'EARNVIDS')).toBe(true);
     expect(isEarnvidsUrlOrServer('https://example.com/test', 'smoothpre')).toBe(true);
     expect(isEarnvidsUrlOrServer('https://example.com/test', 'earnvid')).toBe(true);
+    expect(isEarnvidsUrlOrServer('https://example.com/test', 'VidHide')).toBe(true);
   });
 
   it('detecta por dominio en la URL', () => {
@@ -44,6 +45,7 @@ describe('EarnVids Utils - isEarnvidsUrlOrServer', () => {
     expect(isEarnvidsUrlOrServer('https://earnvids.com/d/3r0ttf5nvn5w')).toBe(true);
     expect(isEarnvidsUrlOrServer('https://earnvids.com/e/3r0ttf5nvn5w')).toBe(true);
     expect(isEarnvidsUrlOrServer('https://earnvid.net/v/3r0ttf5nvn5w')).toBe(true);
+    expect(isEarnvidsUrlOrServer('https://vidhidepro.com/v/3r0ttf5nvn5w')).toBe(true);
   });
 
   it('no detecta otros servidores como Doodstream, Streamwish o Mixdrop', () => {
@@ -111,7 +113,7 @@ describe('EarnVids Formatting & doodstreamUtils Integration', () => {
 
   it('mantiene la compatibilidad con Streamwish, Doodstream, Mixdrop y Dropload', () => {
     expect(formatDoodstreamUrl('https://streamwish.to/e/3r0ttf5nvn5w')).toBe('https://streamwish.fun/e/3r0ttf5nvn5w');
-    expect(formatDoodstreamUrl('https://doodstream.com/d/abc123456')).toBe('https://dood.to/e/abc123456');
+    expect(formatDoodstreamUrl('https://doodstream.com/d/abc123456')).toBe('https://playmogo.com/e/abc123456');
     expect(formatDoodstreamUrl('https://mixdrop.co/f/mix123456')).toBe('https://mixdrop.ps/e/mix123456');
     expect(formatDoodstreamUrl('https://dropload.io/d/drop123456')).toBe('https://dr0pstream.com/e/drop123456');
   });

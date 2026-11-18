@@ -304,7 +304,7 @@ export default function ScraperAnimeOnlineNinja() {
                   <option value="STREAMWISH">Streamwish</option>
                   <option value="EARNVIDS">Earnvids</option>
                   <option value="UQLOAD">Uqload</option>
-                  <option value="FILEMOON">Filemoon</option>
+                  <option value="FILEMOON">FileMoon / Bysekoze</option>
                   <option value="MP4UPLOAD">Mp4upload</option>
                   <option value="ZOPLAYER">ZOPlayer</option>
                 </select>

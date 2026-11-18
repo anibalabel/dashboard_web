@@ -502,7 +502,7 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                   }`}
                 >
                   <ListVideo className="h-4 w-4" />
-                  Byse
+                  FileMoon / Bysekoze
                 </Link>
                 <Link
                   to="/servidores/vidara"

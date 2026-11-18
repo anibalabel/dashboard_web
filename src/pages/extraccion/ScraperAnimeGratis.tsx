@@ -250,7 +250,7 @@ export default function ScraperAnimeGratis() {
                     <option value="VOE">Voe</option>
                     <option value="MAILRU">Mailru</option>
                     <option value="HLS">HLS</option>
-                    <option value="BYSE">Byse</option>
+                    <option value="BYSE">FileMoon / Bysekoze</option>
                     <option value="UQLOAD">Uqload</option>
                     <option value="UPNSHARE">Upnshare</option>
                     <option value="MP4UPLOAD">Mp4upload</option>

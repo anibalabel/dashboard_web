@@ -19,6 +19,13 @@ import {
   DocinesMovie
 } from '../../types';
 import { QUALITY_OPTIONS, SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '../../lib/constants';
+import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
+import {
+  DooplexSourceType,
+  inferSourceFromSelection,
+  normalizeServerLabel,
+  prepareRegistrationLink
+} from '../../lib/registrationUtils';
 
 export default function RegistroMultiplePeliculas() {
   const [tmdbId, setTmdbId] = useState('');
@@ -63,10 +70,16 @@ export default function RegistroMultiplePeliculas() {
   };
 
   const handleGlobalHeaderChange = (newHeader: string) => {
-    setPlusmovieHeader(newHeader);
-    setDooplexHeader(newHeader);
-    setDocinesHeader(newHeader);
-    if (newHeader) setDooplexQuality(newHeader);
+    const normalizedHeader = normalizeServerLabel(newHeader);
+    setPlusmovieHeader(normalizedHeader);
+    setDooplexHeader(normalizedHeader);
+    setDocinesHeader(normalizedHeader);
+    if (normalizedHeader) {
+      setDooplexQuality(normalizedHeader);
+      setDooplexSource(inferSourceFromSelection(normalizedHeader));
+    } else {
+      setDooplexSource('embed');
+    }
   };
 
   // Form Data - Plusmovie
@@ -268,10 +281,12 @@ export default function RegistroMultiplePeliculas() {
       // Plusmovie Registration
       if (usePlusmovie && plusmovieData) {
         try {
+          const normalizedPlusUrl = formatDoodstreamUrl(currentUrl, plusmovieHeader);
+          const normalizedPlusHeader = normalizeServerLabel(plusmovieHeader);
           await registerPlusmovieMovie({
             videos_id: plusmovieData.videos_id,
-            file_url: currentUrl,
-            label: plusmovieHeader ? `${plusmovieLang} - ${plusmovieHeader}` : plusmovieLang
+            file_url: normalizedPlusUrl,
+            label: normalizedPlusHeader ? `${plusmovieLang} - ${normalizedPlusHeader}` : plusmovieLang
           });
           setProgress(prev => ({
             ...prev,
@@ -288,20 +303,20 @@ export default function RegistroMultiplePeliculas() {
       // Dooplex Registration
       if (useDooplex && dooplexData) {
         try {
-          const sourceFlags = {
-            embed: dooplexSource === 'embed' ? '1' : '0',
-            youtubelink: dooplexSource === 'youtubelink' ? '1' : '0',
-            hls: dooplexSource === 'hls' ? '1' : '0',
-            supported_hosts: dooplexSource === 'supported_hosts' ? '1' : '0'
-          };
+          const prepared = prepareRegistrationLink({
+            url: currentUrl,
+            server: dooplexQuality,
+            header: dooplexHeader,
+            source: dooplexSource as DooplexSourceType
+          });
 
           await registerDooplexMovie({
             movie_id: dooplexData.id,
-            server: dooplexQuality,
-            header: dooplexHeader,
-            link: currentUrl,
+            server: prepared.server,
+            header: prepared.header,
+            link: prepared.link,
             lang: dooplexLang,
-            ...sourceFlags
+            ...prepared.sourceFlags
           });
           setProgress(prev => ({
             ...prev,
@@ -318,10 +333,12 @@ export default function RegistroMultiplePeliculas() {
       // Docines Registration
       if (useDocines && docinesData) {
         try {
+          const normalizedDocinesUrl = formatDoodstreamUrl(currentUrl, docinesHeader);
+          const normalizedDocinesHeader = normalizeServerLabel(docinesHeader);
           await registerDocinesMovie({
             movie_id: docinesData.id,
-            name: docinesHeader ? `${docinesLang} - ${docinesHeader}` : docinesLang,
-            url: currentUrl,
+            name: normalizedDocinesHeader ? `${docinesLang} - ${normalizedDocinesHeader}` : docinesLang,
+            url: normalizedDocinesUrl,
             quality: docinesQuality
           });
           setProgress(prev => ({
@@ -556,7 +573,11 @@ export default function RegistroMultiplePeliculas() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Calidad</label>
                   <select
                     value={dooplexQuality}
-                    onChange={(e) => setDooplexQuality(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDooplexQuality(val);
+                      setDooplexSource(inferSourceFromSelection(val));
+                    }}
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2 text-sm"
                   >
                     {SERVER_OPTIONS.map((opt) => (

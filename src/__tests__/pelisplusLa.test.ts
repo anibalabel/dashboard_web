@@ -383,7 +383,7 @@ describe('PelisplusHD.la Utils - Series & Episodios', () => {
       formatPelisplusLaOptionUrl('https://uqload.io/embed-xbsidtff7mme.html', 'uqload')
     ).toBe('https://uqload.vc/embed-xbsidtff7mme.html');
     expect(formatPelisplusLaOptionUrl('http://www.uqload.is/abc12345.html')).toBe(
-      'https://uqload.vc/abc12345.html'
+      'https://uqload.vc/embed-abc12345.html'
     );
     expect(formatPelisplusLaOptionUrl('https://doodstream.com/e/ari29z9p5d8x', 'DoFast')).toBe(
       'https://playmogo.com/e/ari29z9p5d8x'
