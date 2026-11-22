@@ -16,9 +16,13 @@ import {
   getDooplexSourceBadgeLabel,
   isV2LanguageExcluded,
   isV2ServerExcluded,
+  loadV2ServerFormat,
   parseBulkEpisodesV2Text,
-  ParsedV2EpisodeGroup
+  ParsedV2EpisodeGroup,
+  saveV2ServerFormat,
+  V2ServerFormatMode
 } from '../../lib/registrationUtils';
+import { V2ServerFormatSelect } from '../../components/V2ServerFormatSelect';
 
 const DEFAULT_EXCLUDED_SERVERS = ['doodstream', 'waaw', 'dsvplay'];
 const STORAGE_KEY_EXCLUDED = 'dooplex_v2_excluded_servers';
@@ -52,6 +56,11 @@ export default function RegistroDooplexV2() {
   // Form Data
   const [urls, setUrls] = useState('');
   const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [serverFormat, setServerFormat] = useState<V2ServerFormatMode>(() => loadV2ServerFormat());
+
+  useEffect(() => {
+    saveV2ServerFormat(serverFormat);
+  }, [serverFormat]);
 
   // Excluded Servers State (shared in localStorage)
   const [excludedServers, setExcludedServers] = useState<string[]>(() => {
@@ -193,8 +202,8 @@ export default function RegistroDooplexV2() {
   });
 
   const { groups: parsedGroups, detectedServers, detectedLangs, discardedCount } = useMemo(
-    () => parseBulkEpisodesV2Text(urls, skipDuplicates, excludedServers, excludedLangs),
-    [urls, skipDuplicates, excludedServers, excludedLangs]
+    () => parseBulkEpisodesV2Text(urls, skipDuplicates, excludedServers, excludedLangs, serverFormat),
+    [urls, skipDuplicates, excludedServers, excludedLangs, serverFormat]
   );
 
   const totalParsedLinks = useMemo(
@@ -461,6 +470,8 @@ export default function RegistroDooplexV2() {
                     ))}
                   </select>
                 </div>
+
+                <V2ServerFormatSelect value={serverFormat} onChange={setServerFormat} />
               </div>
             </div>
 

@@ -121,6 +121,73 @@ export function prepareRegistrationLink(params: {
 
 // --- V2 Bulk Episode Parser helpers (RegistroDooplexV2 & RegistroAnimeV2) ---
 
+export type V2ServerFormatMode = 'quality_and_header' | 'header_only' | 'quality_only';
+
+export const STORAGE_KEY_V2_SERVER_FORMAT = 'dooplex_v2_server_format';
+
+export const V2_SERVER_FORMAT_OPTIONS: { value: V2ServerFormatMode; label: string }[] = [
+  { value: 'quality_and_header', label: 'Calidad + Servidor (ej. 1080p HD Vidara)' },
+  { value: 'header_only', label: 'Igual que Header / Servidor (ej. Vidara)' },
+  { value: 'quality_only', label: 'Solo Calidad del texto (ej. 1080p HD)' },
+];
+
+export function loadV2ServerFormat(): V2ServerFormatMode {
+  try {
+    const saved = typeof localStorage !== 'undefined'
+      ? localStorage.getItem(STORAGE_KEY_V2_SERVER_FORMAT)
+      : null;
+    if (saved === 'quality_and_header' || saved === 'header_only' || saved === 'quality_only') {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'quality_and_header';
+}
+
+export function saveV2ServerFormat(mode: V2ServerFormatMode): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_V2_SERVER_FORMAT, mode);
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Construye el valor final de la columna `server` en V2 según el modo elegido:
+ * - `quality_and_header`: "1080p HD Vidara"
+ * - `header_only`: "Vidara" (lo mismo que `header`)
+ * - `quality_only`: "1080p HD"
+ */
+export function formatV2ServerValue(
+  quality: string,
+  header: string,
+  mode: V2ServerFormatMode = 'quality_and_header'
+): string {
+  const cleanQuality = quality.trim();
+  const cleanHeader = header.trim();
+
+  if (mode === 'header_only') {
+    return cleanHeader || cleanQuality;
+  }
+  if (mode === 'quality_only') {
+    return cleanQuality || cleanHeader;
+  }
+
+  if (!cleanQuality) return cleanHeader;
+  if (!cleanHeader) return cleanQuality;
+
+  // Evita duplicar el servidor si [Calidad] ya lo incluye al final o completo (ej. [Vidara] + Vidara)
+  const endsWithHeader = new RegExp(`(?:^|\\s)${escapeRegExp(cleanHeader)}$`, 'i').test(cleanQuality);
+  return endsWithHeader ? cleanQuality : `${cleanQuality} ${cleanHeader}`;
+}
+
 export interface ParsedV2LinkItem {
   episodeNumber: number | null;
   server: string;
@@ -214,7 +281,8 @@ export function parseBulkEpisodesV2Text(
   rawText: string,
   skipDuplicates: boolean,
   excludedServers: string[],
-  excludedLangs: string[]
+  excludedLangs: string[],
+  serverFormatMode: V2ServerFormatMode = 'quality_and_header'
 ): ParseV2Result {
   const lines = rawText.split(/\r?\n/);
   const groups: ParsedV2EpisodeGroup[] = [];
@@ -293,7 +361,7 @@ export function parseBulkEpisodesV2Text(
 
       currentGroup.items.push({
         episodeNumber: currentGroup.episodeNumber,
-        server: prepared.server,
+        server: formatV2ServerValue(prepared.server, prepared.header, serverFormatMode),
         lang,
         rawLang,
         header: prepared.header,

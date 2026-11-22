@@ -6,6 +6,7 @@ import { DEFAULT_STREAMWISH_BASE, setStreamwishBaseUrl } from '../lib/streamwish
 import {
   buildDooplexSourceFlags,
   FILEMOON_BYSEKOZE_OPTION,
+  formatV2ServerValue,
   getDooplexSourceBadgeLabel,
   inferSourceFromSelection,
   normalizeServerLabel,
@@ -189,14 +190,30 @@ EPISODIO 1 [T1·E1] - Inicio
     const items = parsed.groups[0].items;
     expect(items).toHaveLength(9);
 
-    expect(items[0]).toMatchObject({ header: 'Vidara', link: 'https://vidara.so/v/vr111', source: 'supported_hosts', lang: 'LAT' });
-    expect(items[1]).toMatchObject({ header: 'YouTube', link: 'https://www.youtube.com/watch?v=abc123XYZ00', source: 'youtubelink', lang: 'CAST' });
-    expect(items[2]).toMatchObject({ header: 'FileMoon / Bysekoze', link: 'https://bysekoze.com/e/bs222', source: 'embed', lang: 'SUB' });
-    expect(items[3]).toMatchObject({ link: 'https://uqload.vc/embed-uq333.html' });
-    expect(items[4]).toMatchObject({ link: 'https://mixdrop.ps/e/mx444' });
-    expect(items[5]).toMatchObject({ link: 'https://smoothpre.com/v/vh555' });
-    expect(items[6]).toMatchObject({ link: 'https://streamwish.fun/e/sw666' });
-    expect(items[7]).toMatchObject({ link: 'https://voe.sx/e/vo777' });
-    expect(items[8]).toMatchObject({ link: 'https://playmogo.com/e/dd888' });
+    expect(items[0]).toMatchObject({ server: '1080p HD Vidara', header: 'Vidara', link: 'https://vidara.so/v/vr111', source: 'supported_hosts', lang: 'LAT' });
+    expect(items[1]).toMatchObject({ server: '1080p HD YouTube', header: 'YouTube', link: 'https://www.youtube.com/watch?v=abc123XYZ00', source: 'youtubelink', lang: 'CAST' });
+    expect(items[2]).toMatchObject({ server: '1080p HD FileMoon / Bysekoze', header: 'FileMoon / Bysekoze', link: 'https://bysekoze.com/e/bs222', source: 'embed', lang: 'SUB' });
+    expect(items[3]).toMatchObject({ server: '1080p HD UQLoad', link: 'https://uqload.vc/embed-uq333.html' });
+    expect(items[4]).toMatchObject({ server: '1080p HD MixDrop', link: 'https://mixdrop.ps/e/mx444' });
+    expect(items[5]).toMatchObject({ server: '1080p HD VidHide', link: 'https://smoothpre.com/v/vh555' });
+    expect(items[6]).toMatchObject({ server: '1080p HD StreamWish', link: 'https://streamwish.fun/e/sw666' });
+    expect(items[7]).toMatchObject({ server: '1080p HD VOE', link: 'https://voe.sx/e/vo777' });
+    expect(items[8]).toMatchObject({ server: '1080p HD DoodStream', link: 'https://playmogo.com/e/dd888' });
+  });
+
+  it('formatV2ServerValue y parseBulkEpisodesV2Text soportan quality_and_header, header_only y quality_only', () => {
+    expect(formatV2ServerValue('1080p HD', 'Vidara', 'quality_and_header')).toBe('1080p HD Vidara');
+    expect(formatV2ServerValue('Vidara', 'Vidara', 'quality_and_header')).toBe('Vidara');
+    expect(formatV2ServerValue('1080p HD Vidara', 'Vidara', 'quality_and_header')).toBe('1080p HD Vidara');
+    expect(formatV2ServerValue('1080p HD', 'Vidara', 'header_only')).toBe('Vidara');
+    expect(formatV2ServerValue('1080p HD', 'Vidara', 'quality_only')).toBe('1080p HD');
+
+    const block = `EPISODIO 1\n• [1080p HD] [Latino] virda -> https://vidara.to/e/vr111`;
+
+    const asHeader = parseBulkEpisodesV2Text(block, true, [], [], 'header_only');
+    expect(asHeader.groups[0].items[0]).toMatchObject({ server: 'Vidara', header: 'Vidara' });
+
+    const asQuality = parseBulkEpisodesV2Text(block, true, [], [], 'quality_only');
+    expect(asQuality.groups[0].items[0]).toMatchObject({ server: '1080p HD', header: 'Vidara' });
   });
 });
