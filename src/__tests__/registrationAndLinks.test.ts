@@ -112,6 +112,10 @@ describe('Constants & Registration Helpers (FileMoon / Bysekoze, YouTube, Vidara
     expect(SERVER_OPTIONS.some((o) => o.value === 'Vidara')).toBe(true);
     expect(HEADER_OPTIONS.some((o) => o.value === 'Vidara')).toBe(true);
 
+    expect(SERVER_OPTIONS.some((o) => o.value === 'Primeload' && o.label === 'Primeload')).toBe(true);
+    expect(HEADER_OPTIONS.some((o) => o.value === 'Primeload' && o.label === 'Primeload')).toBe(true);
+    expect(SERVER_OPTIONS).toEqual(HEADER_OPTIONS);
+
     expect(SERVER_OPTIONS.some((o) => /^byse(?:\.sx)?$/i.test(o.value) || /^byse$/i.test(o.label))).toBe(false);
     expect(HEADER_OPTIONS.some((o) => /^byse(?:\.sx)?$/i.test(o.value) || /^byse$/i.test(o.label))).toBe(false);
   });
@@ -122,6 +126,8 @@ describe('Constants & Registration Helpers (FileMoon / Bysekoze, YouTube, Vidara
     expect(normalizeServerLabel('filemoon')).toBe('FileMoon / Bysekoze');
     expect(normalizeServerLabel('virda')).toBe('Vidara');
     expect(normalizeServerLabel('youtube')).toBe('YouTube');
+    expect(normalizeServerLabel('primeload')).toBe('Primeload');
+    expect(normalizeServerLabel('primeoad')).toBe('Primeload');
     expect(normalizeServerLabel('1080P')).toBe('1080P');
 
     expect(inferSourceFromSelection('YouTube')).toBe('youtubelink');
@@ -163,6 +169,18 @@ describe('Constants & Registration Helpers (FileMoon / Bysekoze, YouTube, Vidara
     expect(byse.header).toBe('FileMoon / Bysekoze');
     expect(byse.link).toBe('https://bysekoze.com/e/bs999');
     expect(byse.sourceFlags).toEqual({ embed: '1', youtubelink: '0', hls: '0', supported_hosts: '0' });
+
+    const primeload = prepareRegistrationLink({
+      url: 'https://primeload.co/e/pl123',
+      server: 'primeoad',
+      header: 'Primeload',
+      source: 'embed'
+    });
+    expect(primeload.server).toBe('Primeload');
+    expect(primeload.header).toBe('Primeload');
+    expect(primeload.link).toBe('https://primeload.co/e/pl123');
+    expect(primeload.source).toBe('embed');
+    expect(primeload.sourceFlags).toEqual({ embed: '1', youtubelink: '0', hls: '0', supported_hosts: '0' });
 
     expect(buildDooplexSourceFlags('hls')).toEqual({ embed: '0', youtubelink: '0', hls: '1', supported_hosts: '0' });
     expect(getDooplexSourceBadgeLabel('youtubelink')).toBe('YOUTUBE');

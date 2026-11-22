@@ -34,6 +34,9 @@ export function normalizeServerLabel(value?: string | null): string {
   if (/^(?:youtube|youtu\.be|youtubelink)$/i.test(low)) {
     return 'YouTube';
   }
+  if (/^(?:primeload|primeoad)$/i.test(low)) {
+    return 'Primeload';
+  }
   return trimmed;
 }
 

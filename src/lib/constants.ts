@@ -27,6 +27,7 @@ export const HEADER_OPTIONS = [
   { value: 'Vidmoly', label: 'Vidmoly' },
   { value: 'LuluStream', label: 'LuluStream' },
   { value: 'YouTube', label: 'YouTube' },
+  { value: 'Primeload', label: 'Primeload' },
   { value: 'Directo', label: 'Directo' },
   { value: 'Flash', label: 'Flash' },
   { value: 'Otros Servidores', label: 'Otros Servidores' },
