@@ -14,6 +14,7 @@ import {
 import {
   buildDooplexSourceFlags,
   getDooplexSourceBadgeLabel,
+  isDuplicateRegisterResponse,
   isV2LanguageExcluded,
   isV2ServerExcluded,
   loadV2ServerFormat,
@@ -194,7 +195,7 @@ export default function RegistroDooplexV2() {
   const [progress, setProgress] = useState<{
     total: number;
     current: number;
-    logs: { msg: string; isError?: boolean }[];
+    logs: { msg: string; isError?: boolean; isSkipped?: boolean }[];
   }>({
     total: 0,
     current: 0,
@@ -337,7 +338,7 @@ export default function RegistroDooplexV2() {
         const sourceFlags = buildDooplexSourceFlags(item.source);
 
         try {
-          await registerDooplexLink({
+          const res = await registerDooplexLink({
             episode_id: targetEpisode.id,
             server: item.server,
             header: item.header,
@@ -345,13 +346,17 @@ export default function RegistroDooplexV2() {
             lang: item.lang,
             ...sourceFlags
           });
+          const skipped = isDuplicateRegisterResponse(res);
 
           setProgress((prev) => ({
             ...prev,
             logs: [
               {
-                msg: `[Ep ${targetEpisode.episode_number}] OK -> [${item.server}] [${item.lang}] ${item.header} (${getDooplexSourceBadgeLabel(item.source)})`,
-                isError: false
+                msg: skipped
+                  ? `[Ep ${targetEpisode.episode_number}] OMITIDO (ya existe en BD) -> [${item.server}] [${item.lang}] ${item.header}`
+                  : `[Ep ${targetEpisode.episode_number}] OK -> [${item.server}] [${item.lang}] ${item.header} (${getDooplexSourceBadgeLabel(item.source)})`,
+                isError: false,
+                isSkipped: skipped
               },
               ...prev.logs
             ]
@@ -832,7 +837,12 @@ export default function RegistroDooplexV2() {
                 </div>
                 <div className="bg-black rounded-md p-3 h-48 overflow-y-auto font-mono text-xs">
                   {progress.logs.map((log, i) => (
-                    <div key={i} className={`mb-1 ${log.isError ? 'text-red-400' : 'text-green-400'}`}>
+                    <div
+                      key={i}
+                      className={`mb-1 ${
+                        log.isError ? 'text-red-400' : log.isSkipped ? 'text-amber-300' : 'text-green-400'
+                      }`}
+                    >
                       {log.msg}
                     </div>
                   ))}

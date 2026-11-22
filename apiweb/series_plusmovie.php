@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Cargar la conexión a la base de datos db_plusmovie
 require_once __DIR__ . '/db_plusmovie/Database.php';
+require_once __DIR__ . '/duplicate_check.php';
 
 try {
     $db = new PlusMovieDatabase();
@@ -186,6 +187,20 @@ switch ($method) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Faltan parámetros requeridos (seasons_id o videos_id) para el registro']);
                 break;
+            }
+
+            $file_url = trimNullableUrl($file_url);
+            if ($file_url !== null) {
+                $checkStmt = $conn->prepare("SELECT episodes_id, file_url FROM episodes WHERE videos_id = :videos_id AND seasons_id = :seasons_id");
+                $checkStmt->bindParam(':videos_id', $videos_id);
+                $checkStmt->bindParam(':seasons_id', $seasons_id);
+                $checkStmt->execute();
+                $existingRows = $checkStmt->fetchAll(PDO::FETCH_ASSOC);
+                $duplicateRow = findDuplicateUrlRow($existingRows, 'file_url', $file_url);
+                if ($duplicateRow !== null) {
+                    echo json_encode(buildDuplicateResponse(['episodes_id' => (string)$duplicateRow['episodes_id']]));
+                    break;
+                }
             }
 
             // Generar stream_key de longitud 12 usando el método nativo

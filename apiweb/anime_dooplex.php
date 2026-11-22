@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/db_dooplex/Database.php';
+require_once __DIR__ . '/duplicate_check.php';
 
 try {
     $db = new DooplexDatabase();
@@ -218,7 +219,7 @@ switch ($method) {
             $anime_episode_id = $input['anime_episode_id'] ?? null;
             $server = $input['server'] ?? null;
             $header = $input['header'] ?? null;
-            $link = $input['link'] ?? null;
+            $link = trimNullableUrl($input['link'] ?? null);
             $lang = $input['lang'] ?? null;
             $embed = $input['embed'] ?? null;
             $youtubelink = $input['youtubelink'] ?? null;
@@ -229,6 +230,18 @@ switch ($method) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Falta el parámetro anime_episode_id para el registro']);
                 break;
+            }
+
+            if ($link !== null) {
+                $checkStmt = $conn->prepare("SELECT id, `link` FROM anime_videos WHERE anime_episode_id = :anime_episode_id");
+                $checkStmt->bindParam(':anime_episode_id', $anime_episode_id);
+                $checkStmt->execute();
+                $existingRows = $checkStmt->fetchAll(PDO::FETCH_ASSOC);
+                $duplicateRow = findDuplicateUrlRow($existingRows, 'link', $link);
+                if ($duplicateRow !== null) {
+                    echo json_encode(buildDuplicateResponse(['id' => (string)$duplicateRow['id']]));
+                    break;
+                }
             }
 
             $stmt = $conn->prepare("INSERT INTO anime_videos 

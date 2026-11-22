@@ -80,6 +80,18 @@ export function buildDooplexSourceFlags(source: DooplexSourceType): DooplexSourc
   };
 }
 
+export function isDuplicateRegisterResponse(
+  response?: {
+    duplicate?: boolean;
+    skipped?: boolean;
+    success?: boolean;
+    message?: string;
+    data?: unknown;
+  } | null
+): boolean {
+  return Boolean(response?.duplicate || response?.skipped);
+}
+
 export function getDooplexSourceBadgeLabel(source: DooplexSourceType): string {
   if (source === 'supported_hosts') return 'SUPPORTED HOST';
   if (source === 'youtubelink') return 'YOUTUBE';

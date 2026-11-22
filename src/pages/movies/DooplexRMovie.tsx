@@ -7,6 +7,7 @@ import { SERVER_OPTIONS, HEADER_OPTIONS, LANG_OPTIONS, SOURCE_OPTIONS } from '..
 import {
   DooplexSourceType,
   inferSourceFromSelection,
+  isDuplicateRegisterResponse,
   prepareRegistrationLink,
 } from '../../lib/registrationUtils';
 import { useSnackbarStore } from '../../store/snackbarStore';
@@ -32,7 +33,7 @@ export default function DooplexRMovie() {
 
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
-  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string; isError?: boolean }[] }>({
+  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string; isError?: boolean; isSkipped?: boolean }[] }>({
     total: 0,
     current: 0,
     logs: []
@@ -98,6 +99,7 @@ export default function DooplexRMovie() {
     setProgress({ total: urlList.length, current: 0, logs: [] });
 
     let successCount = 0;
+    let skippedCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < urlList.length; i++) {
@@ -111,7 +113,7 @@ export default function DooplexRMovie() {
       const logPrefix = `[URL ${i + 1}/${urlList.length}]`;
 
       try {
-        await registerDooplexMovie({
+        const res = await registerDooplexMovie({
           movie_id: dooplexData.id,
           server: prepared.server,
           header: prepared.header,
@@ -120,15 +122,27 @@ export default function DooplexRMovie() {
           ...prepared.sourceFlags
         });
 
-        successCount++;
-        setProgress(prev => ({
-          ...prev,
-          current: i + 1,
-          logs: [
-            { msg: `${logPrefix} Registrado exitosamente: ${prepared.link.substring(0, 50)}...`, isError: false },
-            ...prev.logs
-          ]
-        }));
+        if (isDuplicateRegisterResponse(res)) {
+          skippedCount++;
+          setProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            logs: [
+              { msg: `${logPrefix} Omitido (ya existe en BD): ${prepared.link.substring(0, 50)}...`, isSkipped: true },
+              ...prev.logs
+            ]
+          }));
+        } else {
+          successCount++;
+          setProgress(prev => ({
+            ...prev,
+            current: i + 1,
+            logs: [
+              { msg: `${logPrefix} Registrado exitosamente: ${prepared.link.substring(0, 50)}...`, isError: false },
+              ...prev.logs
+            ]
+          }));
+        }
       } catch {
         errorCount++;
         setProgress(prev => ({
@@ -143,10 +157,12 @@ export default function DooplexRMovie() {
     }
 
     setIsRegistering(false);
-    if (errorCount === 0) {
+    if (errorCount === 0 && skippedCount === 0) {
       showSnackbar(`¡${successCount} enlaces registrados con éxito en Dooplex!`, 'success');
+    } else if (errorCount === 0) {
+      showSnackbar(`Completado: ${successCount} registrados, ${skippedCount} ya existían en BD (omitidos)`, 'info');
     } else {
-      showSnackbar(`Registro completado: ${successCount} exitosos, ${errorCount} fallidos`, 'info');
+      showSnackbar(`Completado: ${successCount} exitosos, ${skippedCount} omitidos, ${errorCount} fallidos`, 'info');
     }
   };
 
@@ -450,6 +466,8 @@ export default function DooplexRMovie() {
                       className={`text-xs p-2.5 rounded-lg border leading-snug font-mono break-all ${
                         log.isError
                           ? 'bg-red-50 text-red-700 border-red-200'
+                          : log.isSkipped
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
                           : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                       }`}
                     >

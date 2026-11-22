@@ -6,6 +6,7 @@ import { HEADER_OPTIONS, LANG_OPTIONS, SERVER_OPTIONS, SOURCE_OPTIONS } from '..
 import {
   DooplexSourceType,
   inferSourceFromSelection,
+  isDuplicateRegisterResponse,
   prepareRegistrationLink
 } from '../../lib/registrationUtils';
 
@@ -31,7 +32,7 @@ export default function RegistroAnime() {
   const [progress, setProgress] = useState<{
     total: number;
     current: number;
-    logs: { msg: string; isError?: boolean }[];
+    logs: { msg: string; isError?: boolean; isSkipped?: boolean }[];
   }>({ total: 0, current: 0, logs: [] });
 
   const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
@@ -168,7 +169,7 @@ export default function RegistroAnime() {
           source: source as DooplexSourceType
         });
 
-        await registerDooplexAnimeEpisodeVideo({
+        const res = await registerDooplexAnimeEpisodeVideo({
           anime_episode_id: currentEpisode.id,
           server: prepared.server,
           header: prepared.header,
@@ -176,10 +177,17 @@ export default function RegistroAnime() {
           lang,
           ...prepared.sourceFlags
         });
+        const skipped = isDuplicateRegisterResponse(res);
 
         setProgress((prev) => ({
           ...prev,
-          logs: [{ msg: `[Anime] Episodio ${currentEpisode.episode_number} registrado.`, isError: false }, ...prev.logs]
+          logs: [{
+            msg: skipped
+              ? `[Anime] Episodio ${currentEpisode.episode_number} omitido (ya existe en BD).`
+              : `[Anime] Episodio ${currentEpisode.episode_number} registrado.`,
+            isError: false,
+            isSkipped: skipped
+          }, ...prev.logs]
         }));
       } catch {
         setProgress((prev) => ({
@@ -409,7 +417,11 @@ export default function RegistroAnime() {
                     <div
                       key={idx}
                       className={`text-sm p-2 rounded-md flex items-center gap-2 ${
-                        l.isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                        l.isError
+                          ? 'bg-red-50 text-red-700'
+                          : l.isSkipped
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'bg-green-50 text-green-700'
                       }`}
                     >
                       {l.isError ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}

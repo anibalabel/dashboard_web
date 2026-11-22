@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Cargar la conexión a la base de datos db_docines
 require_once __DIR__ . '/db_docines/Database.php';
+require_once __DIR__ . '/duplicate_check.php';
 
 try {
     $db = new DocinesDatabase();
@@ -172,10 +173,23 @@ switch ($method) {
                 break;
             }
 
-            $stmt = $conn->prepare("SELECT link_order FROM movie_play_links WHERE movie_id = :movie_id ORDER BY link_order ASC");
+            $clean_url = trimNullableUrl($url);
+            $stmt = $conn->prepare("SELECT id, url, link_order FROM movie_play_links WHERE movie_id = :movie_id ORDER BY link_order ASC");
             $stmt->bindParam(':movie_id', $movie_id);
             $stmt->execute();
             $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if ($clean_url !== null) {
+                $duplicateRow = findDuplicateUrlRow($orders, 'url', $clean_url);
+                if ($duplicateRow !== null) {
+                    echo json_encode(buildDuplicateResponse([
+                        'id' => (string)$duplicateRow['id'],
+                        'link_order' => (int)($duplicateRow['link_order'] ?? 0)
+                    ]));
+                    break;
+                }
+            }
+            $url = $clean_url;
 
             $next_link_order = 1;
             foreach ($orders as $row) {

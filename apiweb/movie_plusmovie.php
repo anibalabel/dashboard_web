@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Cargar la conexión a la base de datos db_plusmovie
 require_once __DIR__ . '/db_plusmovie/Database.php';
+require_once __DIR__ . '/duplicate_check.php';
 
 try {
     $db = new PlusMovieDatabase();
@@ -120,16 +121,26 @@ switch ($method) {
             
         } else {
             // 5: Registro / Insert
-            if (!$videos_id || $file_url === null || trim((string)$file_url) === '' || $label === null || trim((string)$label) === '') {
+            $file_url = trimNullableUrl($file_url);
+            if (!$videos_id || $file_url === null || $label === null || trim((string)$label) === '') {
                 http_response_code(400);
                 echo json_encode(['error' => 'Faltan parámetros (videos_id, file_url, label)']);
                 break;
             }
 
-            $stmt = $conn->prepare("SELECT `order` FROM video_file WHERE videos_id = :videos_id ORDER BY `order` ASC");
+            $stmt = $conn->prepare("SELECT video_file_id, file_url, `order` FROM video_file WHERE videos_id = :videos_id ORDER BY `order` ASC");
             $stmt->bindParam(':videos_id', $videos_id);
             $stmt->execute();
             $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $duplicateRow = findDuplicateUrlRow($orders, 'file_url', $file_url);
+            if ($duplicateRow !== null) {
+                echo json_encode(buildDuplicateResponse([
+                    'video_file_id' => (string)$duplicateRow['video_file_id'],
+                    'order' => (int)($duplicateRow['order'] ?? 0)
+                ]));
+                break;
+            }
 
             $next_order = 1;
             foreach ($orders as $row) {

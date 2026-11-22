@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Cargar la conexión a la base de datos db_docines
 require_once __DIR__ . '/db_docines/Database.php';
+require_once __DIR__ . '/duplicate_check.php';
 
 try {
     $db = new DocinesDatabase();
@@ -210,14 +211,21 @@ switch ($method) {
                 break;
             }
 
-            // `link_order` --> contar `episode_id` en la tabla `episode_play_links` por `episode_id`, y sumarle +1
-            $stmt = $conn->prepare("SELECT COUNT(episode_id) as cuenta FROM episode_play_links WHERE episode_id = :episode_id");
+            $clean_url = trimNullableUrl($url);
+            $stmt = $conn->prepare("SELECT id, url FROM episode_play_links WHERE episode_id = :episode_id");
             $stmt->bindParam(':episode_id', $episode_id);
             $stmt->execute();
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $count = (int)($row['cuenta'] ?? 0);
-            
-            $link_order = $count + 1;
+            $existingRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if ($clean_url !== null) {
+                $duplicateRow = findDuplicateUrlRow($existingRows, 'url', $clean_url);
+                if ($duplicateRow !== null) {
+                    echo json_encode(buildDuplicateResponse(['id' => (string)$duplicateRow['id']]));
+                    break;
+                }
+            }
+            $url = $clean_url;
+            $link_order = count($existingRows) + 1;
 
             // Valores predeterminados
             $status = 1;

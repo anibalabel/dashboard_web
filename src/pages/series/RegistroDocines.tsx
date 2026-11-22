@@ -13,7 +13,7 @@ import {
 } from '../../types';
 import { LANG_OPTIONS, QUALITY_OPTIONS, HEADER_OPTIONS } from '../../lib/constants';
 import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
-import { normalizeServerLabel } from '../../lib/registrationUtils';
+import { isDuplicateRegisterResponse, normalizeServerLabel } from '../../lib/registrationUtils';
 
 export default function RegistroDocines() {
   const [tmdbId, setTmdbId] = useState('');
@@ -39,7 +39,7 @@ export default function RegistroDocines() {
 
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
-  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean }[] }>({
+  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean, isSkipped?: boolean }[] }>({
     total: 0,
     current: 0,
     logs: []
@@ -165,15 +165,22 @@ export default function RegistroDocines() {
       try {
         const normalizedHeader = normalizeServerLabel(docinesHeader);
         const normalizedUrl = formatDoodstreamUrl(currentUrl, normalizedHeader);
-        await registerDocinesLink({
+        const res = await registerDocinesLink({
           episode_id: currentEpisode.id,
           quality: docinesQuality,
           name: normalizedHeader ? `${docinesLang} - ${normalizedHeader}` : docinesLang,
           url: normalizedUrl
         });
+        const skipped = isDuplicateRegisterResponse(res);
         setProgress(prev => ({
           ...prev,
-          logs: [{ msg: `[Docines] Episodio ${currentEpisode.episoade_order} registrado.`, isError: false }, ...prev.logs]
+          logs: [{
+            msg: skipped
+              ? `[Docines] Episodio ${currentEpisode.episoade_order} omitido (ya existe en BD).`
+              : `[Docines] Episodio ${currentEpisode.episoade_order} registrado.`,
+            isError: false,
+            isSkipped: skipped
+          }, ...prev.logs]
         }));
       } catch {
         setProgress(prev => ({
@@ -363,7 +370,12 @@ export default function RegistroDocines() {
                 </div>
                 <div className="bg-black rounded-md p-3 h-48 overflow-y-auto font-mono text-xs">
                   {progress.logs.map((log, i) => (
-                    <div key={i} className={`mb-1 ${log.isError ? 'text-red-400' : 'text-green-400'}`}>
+                    <div
+                      key={i}
+                      className={`mb-1 ${
+                        log.isError ? 'text-red-400' : log.isSkipped ? 'text-amber-300' : 'text-green-400'
+                      }`}
+                    >
                       {log.msg}
                     </div>
                   ))}

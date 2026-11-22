@@ -1,6 +1,12 @@
 // @ts-ignore - Built-in Cloudflare Workers TCP socket API
 import { connect } from 'cloudflare:sockets';
 import bcrypt from 'bcryptjs';
+import {
+  buildDuplicateResponse,
+  computeNextMissingOrder,
+  findDuplicateUrlRow,
+  trimNullableUrl,
+} from './duplicateCheck';
 
 // ============================================================================
 // Pure-JS MD5 implementation for Web Workers / Cloudflare Edge
@@ -699,7 +705,7 @@ async function handleMovieDooplex(request: Request, searchParams: URLSearchParam
 
           const server = input.server ?? null;
           const header = input.header ?? null;
-          const link = input.link ?? null;
+          const link = trimNullableUrl(input.link);
           const lang = input.lang ?? null;
           const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
           const youtubelink = input.youtubelink ?? null;
@@ -707,6 +713,16 @@ async function handleMovieDooplex(request: Request, searchParams: URLSearchParam
           const supportedHosts = Array.isArray(input.supported_hosts)
             ? JSON.stringify(input.supported_hosts)
             : (input.supported_hosts ?? null);
+
+          if (link) {
+            const { rows: existingRows } = await query('SELECT id, `link` FROM movie_videos WHERE movie_id = ?', [
+              movieId,
+            ]);
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+            if (duplicateRow) {
+              return jsonResponse(200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            }
+          }
 
           const res = await query(
             'INSERT INTO movie_videos (movie_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -875,7 +891,7 @@ async function handleSeriesDooplex(request: Request, searchParams: URLSearchPara
 
           const server = input.server ?? null;
           const header = input.header ?? null;
-          const link = input.link ?? null;
+          const link = trimNullableUrl(input.link);
           const lang = input.lang ?? null;
           const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
           const youtubelink = input.youtubelink ?? null;
@@ -883,6 +899,16 @@ async function handleSeriesDooplex(request: Request, searchParams: URLSearchPara
           const supportedHosts = Array.isArray(input.supported_hosts)
             ? JSON.stringify(input.supported_hosts)
             : (input.supported_hosts ?? null);
+
+          if (link) {
+            const { rows: existingRows } = await query('SELECT id, `link` FROM serie_videos WHERE episode_id = ?', [
+              episodeId,
+            ]);
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+            if (duplicateRow) {
+              return jsonResponse(200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            }
+          }
 
           const res = await query(
             'INSERT INTO serie_videos (episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1058,7 +1084,7 @@ async function handleAnimeDooplex(request: Request, searchParams: URLSearchParam
 
           const server = input.server ?? null;
           const header = input.header ?? null;
-          const link = input.link ?? null;
+          const link = trimNullableUrl(input.link);
           const lang = input.lang ?? null;
           const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
           const youtubelink = input.youtubelink ?? null;
@@ -1066,6 +1092,17 @@ async function handleAnimeDooplex(request: Request, searchParams: URLSearchParam
           const supportedHosts = Array.isArray(input.supported_hosts)
             ? JSON.stringify(input.supported_hosts)
             : (input.supported_hosts ?? null);
+
+          if (link) {
+            const { rows: existingRows } = await query(
+              'SELECT id, `link` FROM anime_videos WHERE anime_episode_id = ?',
+              [animeEpisodeId]
+            );
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+            if (duplicateRow) {
+              return jsonResponse(200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            }
+          }
 
           const res = await query(
             'INSERT INTO anime_videos (anime_episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1168,24 +1205,28 @@ async function handleMovieDocines(request: Request, searchParams: URLSearchParam
           const movieId = input.movie_id ?? null;
           if (!movieId) return jsonResponse(400, { error: 'Falta el parámetro movie_id para el registro' });
 
-          const { rows: orders } = await query(
-            'SELECT link_order FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
+          const cleanUrl = trimNullableUrl(input.url);
+          const { rows: existingRows } = await query(
+            'SELECT id, url, link_order FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
             [movieId]
           );
-          let nextLinkOrder = 1;
-          for (const row of orders) {
-            const current = Number(row.link_order ?? 0);
-            if (current < nextLinkOrder) continue;
-            if (current === nextLinkOrder) {
-              nextLinkOrder++;
-              continue;
+          if (cleanUrl) {
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'url', cleanUrl);
+            if (duplicateRow) {
+              return jsonResponse(
+                200,
+                buildDuplicateResponse({
+                  id: String(duplicateRow.id),
+                  link_order: Number(duplicateRow.link_order ?? 0),
+                })
+              );
             }
-            if (current > nextLinkOrder) break;
           }
+          const nextLinkOrder = computeNextMissingOrder(existingRows.map((row) => Number(row.link_order ?? 0)));
 
           const res = await query(
             'INSERT INTO movie_play_links (movie_id, name, url, quality, link_order, type, status, skip_available, link_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [movieId, input.name ?? null, input.url ?? null, input.quality ?? null, nextLinkOrder, 'Embed', 1, 0, 0]
+            [movieId, input.name ?? null, cleanUrl, input.quality ?? null, nextLinkOrder, 'Embed', 1, 0, 0]
           );
 
           return jsonResponse(200, {
@@ -1291,14 +1332,22 @@ async function handleSeriesDocines(request: Request, searchParams: URLSearchPara
           const episodeId = input.episode_id ?? null;
           if (!episodeId) return jsonResponse(400, { error: 'Falta el parámetro episode_id para el registro' });
 
-          const countRes = await query('SELECT COUNT(episode_id) AS cuenta FROM episode_play_links WHERE episode_id = ?', [
-            episodeId,
-          ]);
-          const linkOrder = Number(countRes.rows[0]?.cuenta ?? 0) + 1;
+          const cleanUrl = trimNullableUrl(input.url);
+          const { rows: existingRows } = await query(
+            'SELECT id, url FROM episode_play_links WHERE episode_id = ?',
+            [episodeId]
+          );
+          if (cleanUrl) {
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'url', cleanUrl);
+            if (duplicateRow) {
+              return jsonResponse(200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            }
+          }
+          const linkOrder = existingRows.length + 1;
 
           const res = await query(
             'INSERT INTO episode_play_links (name, episode_id, url, quality, status, type, skip_available, link_type, link_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [input.name ?? null, episodeId, input.url ?? null, input.quality ?? null, 1, 'Embed', 0, 0, linkOrder]
+            [input.name ?? null, episodeId, cleanUrl, input.quality ?? null, 1, 'Embed', 0, 0, linkOrder]
           );
 
           return jsonResponse(200, {
@@ -1367,29 +1416,31 @@ async function handleMoviePlusmovie(request: Request, searchParams: URLSearchPar
           return jsonResponse(200, { message: 'Actualizado correctamente' });
         } else {
           const videosId = input.videos_id ?? null;
-          if (!videosId || !input.file_url || !input.label) {
+          const cleanFileUrl = trimNullableUrl(input.file_url);
+          if (!videosId || !cleanFileUrl || !input.label) {
             return jsonResponse(400, { error: 'Faltan parámetros (videos_id, file_url, label)' });
           }
 
-          const { rows: orders } = await query(
-            'SELECT `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
+          const { rows: existingRows } = await query(
+            'SELECT video_file_id, file_url, `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
             [videosId]
           );
-          let nextOrder = 1;
-          for (const row of orders) {
-            const current = Number(row.order ?? 0);
-            if (current < nextOrder) continue;
-            if (current === nextOrder) {
-              nextOrder++;
-              continue;
-            }
-            if (current > nextOrder) break;
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'file_url', cleanFileUrl);
+          if (duplicateRow) {
+            return jsonResponse(
+              200,
+              buildDuplicateResponse({
+                video_file_id: String(duplicateRow.video_file_id),
+                order: Number(duplicateRow.order ?? 0),
+              })
+            );
           }
+          const nextOrder = computeNextMissingOrder(existingRows.map((row) => Number(row.order ?? 0)));
 
           const streamKey = generateStreamKey(12);
           const res = await query(
             'INSERT INTO video_file (stream_key, videos_id, file_source, source_type, file_url, label, `order`) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [streamKey, videosId, 'embed', 'link', input.file_url, input.label, nextOrder]
+            [streamKey, videosId, 'embed', 'link', cleanFileUrl, input.label, nextOrder]
           );
 
           return jsonResponse(200, {
@@ -1488,6 +1539,17 @@ async function handleSeriesPlusmovie(request: Request, searchParams: URLSearchPa
               error: 'Faltan parámetros requeridos (seasons_id o videos_id) para el registro',
             });
           }
+          const cleanFileUrl = trimNullableUrl(input.file_url);
+          if (cleanFileUrl) {
+            const { rows: existingRows } = await query(
+              'SELECT episodes_id, file_url FROM episodes WHERE videos_id = ? AND seasons_id = ?',
+              [videosId, seasonsId]
+            );
+            const duplicateRow = findDuplicateUrlRow(existingRows, 'file_url', cleanFileUrl);
+            if (duplicateRow) {
+              return jsonResponse(200, buildDuplicateResponse({ episodes_id: String(duplicateRow.episodes_id) }));
+            }
+          }
           const streamKey = generateStreamKey(12);
           const res = await query(
             'INSERT INTO episodes (stream_key, videos_id, seasons_id, episodes_name, file_source, source_type, file_url, `order`, date_added, last_ep_added) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1498,7 +1560,7 @@ async function handleSeriesPlusmovie(request: Request, searchParams: URLSearchPa
               input.episodes_name ?? null,
               input.file_source ?? 'embed',
               input.source_type ?? 'link',
-              input.file_url ?? null,
+              cleanFileUrl,
               input.order ?? null,
               currentDate,
               currentDate,

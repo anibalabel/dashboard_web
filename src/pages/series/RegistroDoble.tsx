@@ -25,6 +25,7 @@ import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
 import {
   DooplexSourceType,
   inferSourceFromSelection,
+  isDuplicateRegisterResponse,
   prepareRegistrationLink
 } from '../../lib/registrationUtils';
 
@@ -66,7 +67,7 @@ export default function RegistroDoble() {
 
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
-  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean }[] }>({
+  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean, isSkipped?: boolean }[] }>({
     total: 0,
     current: 0,
     logs: []
@@ -282,7 +283,7 @@ export default function RegistroDoble() {
             source: dooplexSource as DooplexSourceType
           });
 
-          await registerDooplexLink({
+          const res = await registerDooplexLink({
             episode_id: currentEpisode.id,
             server: prepared.server,
             header: prepared.header,
@@ -290,9 +291,16 @@ export default function RegistroDoble() {
             lang: dooplexLang,
             ...prepared.sourceFlags
           });
+          const skipped = isDuplicateRegisterResponse(res);
           setProgress(prev => ({
             ...prev,
-            logs: [{ msg: `[Dooplex] Episodio ${currentEpisode.episode_number} registrado.`, isError: false }, ...prev.logs]
+            logs: [{
+              msg: skipped
+                ? `[Dooplex] Episodio ${currentEpisode.episode_number} omitido (ya existe en BD).`
+                : `[Dooplex] Episodio ${currentEpisode.episode_number} registrado.`,
+              isError: false,
+              isSkipped: skipped
+            }, ...prev.logs]
           }));
         } catch {
           setProgress(prev => ({
@@ -305,7 +313,7 @@ export default function RegistroDoble() {
       // Plusmovie Registration
       try {
         const normalizedPlusUrl = formatDoodstreamUrl(currentUrl, isPlusmovieOnly ? undefined : dooplexHeader);
-        await registerPlusmovieEpisode({
+        const res = await registerPlusmovieEpisode({
           videos_id: plusmovieSeries.videos_id,
           seasons_id: Number(selectedPlusmovieSeason),
           episodes_name: `${currentEpisode.episode_number} - ${currentEpisode.name?.trim() || `Episodio ${currentEpisode.episode_number}`}`,
@@ -314,9 +322,16 @@ export default function RegistroDoble() {
           file_url: normalizedPlusUrl,
           order: currentEpisode.episode_number
         });
+        const skipped = isDuplicateRegisterResponse(res);
         setProgress(prev => ({
           ...prev,
-          logs: [{ msg: `[Plusmovie] Episodio ${currentEpisode.episode_number} registrado.`, isError: false }, ...prev.logs]
+          logs: [{
+            msg: skipped
+              ? `[Plusmovie] Episodio ${currentEpisode.episode_number} omitido (ya existe en BD).`
+              : `[Plusmovie] Episodio ${currentEpisode.episode_number} registrado.`,
+            isError: false,
+            isSkipped: skipped
+          }, ...prev.logs]
         }));
       } catch {
         setProgress(prev => ({
@@ -612,7 +627,12 @@ export default function RegistroDoble() {
                 </div>
                 <div className="bg-black rounded-md p-3 h-48 overflow-y-auto font-mono text-xs">
                   {progress.logs.map((log, i) => (
-                    <div key={i} className={`mb-1 ${log.isError ? 'text-red-400' : 'text-green-400'}`}>
+                    <div
+                      key={i}
+                      className={`mb-1 ${
+                        log.isError ? 'text-red-400' : log.isSkipped ? 'text-amber-300' : 'text-green-400'
+                      }`}
+                    >
                       {log.msg}
                     </div>
                   ))}

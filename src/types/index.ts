@@ -374,5 +374,8 @@ export interface DocinesMovieVideoUpdatePayload {
 
 export interface ApiResponse<T> {
   data: T;
+  success?: boolean;
   message?: string;
+  duplicate?: boolean;
+  skipped?: boolean;
 }

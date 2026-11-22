@@ -23,6 +23,7 @@ import { formatDoodstreamUrl } from '../../lib/doodstreamUtils';
 import {
   DooplexSourceType,
   inferSourceFromSelection,
+  isDuplicateRegisterResponse,
   normalizeServerLabel,
   prepareRegistrationLink
 } from '../../lib/registrationUtils';
@@ -102,7 +103,7 @@ export default function RegistroMultiplePeliculas() {
   
   // Registration State
   const [isRegistering, setIsRegistering] = useState(false);
-  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean }[] }>({
+  const [progress, setProgress] = useState<{ total: number; current: number; logs: { msg: string, isError?: boolean, isSkipped?: boolean }[] }>({
     total: 0,
     current: 0,
     logs: []
@@ -283,14 +284,19 @@ export default function RegistroMultiplePeliculas() {
         try {
           const normalizedPlusUrl = formatDoodstreamUrl(currentUrl, plusmovieHeader);
           const normalizedPlusHeader = normalizeServerLabel(plusmovieHeader);
-          await registerPlusmovieMovie({
+          const res = await registerPlusmovieMovie({
             videos_id: plusmovieData.videos_id,
             file_url: normalizedPlusUrl,
             label: normalizedPlusHeader ? `${plusmovieLang} - ${normalizedPlusHeader}` : plusmovieLang
           });
+          const skipped = isDuplicateRegisterResponse(res);
           setProgress(prev => ({
             ...prev,
-            logs: [{ msg: `${logPrefix} Plusmovie: Registrado correctamente.`, isError: false }, ...prev.logs]
+            logs: [{
+              msg: skipped ? `${logPrefix} Plusmovie: Omitido (ya existe en BD).` : `${logPrefix} Plusmovie: Registrado correctamente.`,
+              isError: false,
+              isSkipped: skipped
+            }, ...prev.logs]
           }));
         } catch {
           setProgress(prev => ({
@@ -310,7 +316,7 @@ export default function RegistroMultiplePeliculas() {
             source: dooplexSource as DooplexSourceType
           });
 
-          await registerDooplexMovie({
+          const res = await registerDooplexMovie({
             movie_id: dooplexData.id,
             server: prepared.server,
             header: prepared.header,
@@ -318,9 +324,14 @@ export default function RegistroMultiplePeliculas() {
             lang: dooplexLang,
             ...prepared.sourceFlags
           });
+          const skipped = isDuplicateRegisterResponse(res);
           setProgress(prev => ({
             ...prev,
-            logs: [{ msg: `${logPrefix} Dooplex: Registrado correctamente.`, isError: false }, ...prev.logs]
+            logs: [{
+              msg: skipped ? `${logPrefix} Dooplex: Omitido (ya existe en BD).` : `${logPrefix} Dooplex: Registrado correctamente.`,
+              isError: false,
+              isSkipped: skipped
+            }, ...prev.logs]
           }));
         } catch {
           setProgress(prev => ({
@@ -335,15 +346,20 @@ export default function RegistroMultiplePeliculas() {
         try {
           const normalizedDocinesUrl = formatDoodstreamUrl(currentUrl, docinesHeader);
           const normalizedDocinesHeader = normalizeServerLabel(docinesHeader);
-          await registerDocinesMovie({
+          const res = await registerDocinesMovie({
             movie_id: docinesData.id,
             name: normalizedDocinesHeader ? `${docinesLang} - ${normalizedDocinesHeader}` : docinesLang,
             url: normalizedDocinesUrl,
             quality: docinesQuality
           });
+          const skipped = isDuplicateRegisterResponse(res);
           setProgress(prev => ({
             ...prev,
-            logs: [{ msg: `${logPrefix} Docines: Registrado correctamente.`, isError: false }, ...prev.logs]
+            logs: [{
+              msg: skipped ? `${logPrefix} Docines: Omitido (ya existe en BD).` : `${logPrefix} Docines: Registrado correctamente.`,
+              isError: false,
+              isSkipped: skipped
+            }, ...prev.logs]
           }));
         } catch {
           setProgress(prev => ({
@@ -767,6 +783,8 @@ export default function RegistroMultiplePeliculas() {
                   className={`text-xs p-2 rounded border ${
                     log.isError 
                       ? 'bg-red-50 text-red-700 border-red-200' 
+                      : log.isSkipped
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
                       : 'bg-green-50 text-green-700 border-green-200'
                   }`}
                 >

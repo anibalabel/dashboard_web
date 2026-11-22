@@ -5,6 +5,12 @@ import path from 'node:path';
 import mysql, { type Pool, type ResultSetHeader, type RowDataPacket } from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import type { Plugin } from 'vite';
+import {
+  buildDuplicateResponse,
+  computeNextMissingOrder,
+  findDuplicateUrlRow,
+  trimNullableUrl,
+} from './duplicateCheck';
 
 // ============================================================================
 // Conexiones integradas a las bases de datos MySQL (Dooplex, Docines, PlusMovie)
@@ -321,7 +327,7 @@ async function handleMovieDooplex(req: IncomingMessage, res: ServerResponse, que
 
         const server = input.server ?? null;
         const header = input.header ?? null;
-        const link = input.link ?? null;
+        const link = trimNullableUrl(input.link);
         const lang = input.lang ?? null;
         const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
         const youtubelink = input.youtubelink ?? null;
@@ -329,6 +335,18 @@ async function handleMovieDooplex(req: IncomingMessage, res: ServerResponse, que
         const supportedHosts = Array.isArray(input.supported_hosts)
           ? JSON.stringify(input.supported_hosts)
           : (input.supported_hosts ?? null);
+
+        if (link) {
+          const [existingRows] = await dooplexPool.query<RowDataPacket[]>(
+            'SELECT id, `link` FROM movie_videos WHERE movie_id = ?',
+            [movieId]
+          );
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+          if (duplicateRow) {
+            sendJson(res, 200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            return;
+          }
+        }
 
         const [result] = await dooplexPool.execute<ResultSetHeader>(
           'INSERT INTO movie_videos (movie_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -505,7 +523,7 @@ async function handleSeriesDooplex(req: IncomingMessage, res: ServerResponse, qu
 
         const server = input.server ?? null;
         const header = input.header ?? null;
-        const link = input.link ?? null;
+        const link = trimNullableUrl(input.link);
         const lang = input.lang ?? null;
         const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
         const youtubelink = input.youtubelink ?? null;
@@ -513,6 +531,18 @@ async function handleSeriesDooplex(req: IncomingMessage, res: ServerResponse, qu
         const supportedHosts = Array.isArray(input.supported_hosts)
           ? JSON.stringify(input.supported_hosts)
           : (input.supported_hosts ?? null);
+
+        if (link) {
+          const [existingRows] = await dooplexPool.query<RowDataPacket[]>(
+            'SELECT id, `link` FROM serie_videos WHERE episode_id = ?',
+            [episodeId]
+          );
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+          if (duplicateRow) {
+            sendJson(res, 200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            return;
+          }
+        }
 
         const [result] = await dooplexPool.execute<ResultSetHeader>(
           'INSERT INTO serie_videos (episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -692,7 +722,7 @@ async function handleAnimeDooplex(req: IncomingMessage, res: ServerResponse, que
 
         const server = input.server ?? null;
         const header = input.header ?? null;
-        const link = input.link ?? null;
+        const link = trimNullableUrl(input.link);
         const lang = input.lang ?? null;
         const embed = typeof input.embed === 'boolean' ? (input.embed ? 1 : 0) : (input.embed ?? null);
         const youtubelink = input.youtubelink ?? null;
@@ -700,6 +730,18 @@ async function handleAnimeDooplex(req: IncomingMessage, res: ServerResponse, que
         const supportedHosts = Array.isArray(input.supported_hosts)
           ? JSON.stringify(input.supported_hosts)
           : (input.supported_hosts ?? null);
+
+        if (link) {
+          const [existingRows] = await dooplexPool.query<RowDataPacket[]>(
+            'SELECT id, `link` FROM anime_videos WHERE anime_episode_id = ?',
+            [animeEpisodeId]
+          );
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'link', link);
+          if (duplicateRow) {
+            sendJson(res, 200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            return;
+          }
+        }
 
         const [result] = await dooplexPool.execute<ResultSetHeader>(
           'INSERT INTO anime_videos (anime_episode_id, server, header, `link`, lang, embed, youtubelink, hls, supported_hosts, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -818,23 +860,29 @@ async function handleMovieDocines(req: IncomingMessage, res: ServerResponse, que
           sendJson(res, 400, { error: 'Falta el parámetro movie_id para el registro' });
           return;
         }
-        const [orders] = await docinesPool.query<RowDataPacket[]>(
-          'SELECT link_order FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
+        const cleanUrl = trimNullableUrl(input.url);
+        const [existingRows] = await docinesPool.query<RowDataPacket[]>(
+          'SELECT id, url, link_order FROM movie_play_links WHERE movie_id = ? ORDER BY link_order ASC',
           [movieId]
         );
-        let nextLinkOrder = 1;
-        for (const row of orders) {
-          const current = Number(row.link_order ?? 0);
-          if (current < nextLinkOrder) continue;
-          if (current === nextLinkOrder) {
-            nextLinkOrder++;
-            continue;
+        if (cleanUrl) {
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'url', cleanUrl);
+          if (duplicateRow) {
+            sendJson(
+              res,
+              200,
+              buildDuplicateResponse({
+                id: String(duplicateRow.id),
+                link_order: Number(duplicateRow.link_order ?? 0),
+              })
+            );
+            return;
           }
-          if (current > nextLinkOrder) break;
         }
+        const nextLinkOrder = computeNextMissingOrder(existingRows.map((row) => Number(row.link_order ?? 0)));
         const [result] = await docinesPool.execute<ResultSetHeader>(
           'INSERT INTO movie_play_links (movie_id, name, url, quality, link_order, type, status, skip_available, link_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [movieId, input.name ?? null, input.url ?? null, input.quality ?? null, nextLinkOrder, 'Embed', 1, 0, 0]
+          [movieId, input.name ?? null, cleanUrl, input.quality ?? null, nextLinkOrder, 'Embed', 1, 0, 0]
         );
         sendJson(res, 200, {
           message: 'Registrado correctamente',
@@ -959,14 +1007,22 @@ async function handleSeriesDocines(req: IncomingMessage, res: ServerResponse, qu
           sendJson(res, 400, { error: 'Falta el parámetro episode_id para el registro' });
           return;
         }
-        const [countRows] = await docinesPool.query<RowDataPacket[]>(
-          'SELECT COUNT(episode_id) AS cuenta FROM episode_play_links WHERE episode_id = ?',
+        const cleanUrl = trimNullableUrl(input.url);
+        const [existingRows] = await docinesPool.query<RowDataPacket[]>(
+          'SELECT id, url FROM episode_play_links WHERE episode_id = ?',
           [episodeId]
         );
-        const linkOrder = Number(countRows[0]?.cuenta ?? 0) + 1;
+        if (cleanUrl) {
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'url', cleanUrl);
+          if (duplicateRow) {
+            sendJson(res, 200, buildDuplicateResponse({ id: String(duplicateRow.id) }));
+            return;
+          }
+        }
+        const linkOrder = existingRows.length + 1;
         const [result] = await docinesPool.execute<ResultSetHeader>(
           'INSERT INTO episode_play_links (name, episode_id, url, quality, status, type, skip_available, link_type, link_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [input.name ?? null, episodeId, input.url ?? null, input.quality ?? null, 1, 'Embed', 0, 0, linkOrder]
+          [input.name ?? null, episodeId, cleanUrl, input.quality ?? null, 1, 'Embed', 0, 0, linkOrder]
         );
         sendJson(res, 200, {
           message: 'Registrado correctamente',
@@ -1043,28 +1099,32 @@ async function handleMoviePlusmovie(req: IncomingMessage, res: ServerResponse, q
         sendJson(res, 200, { message: 'Actualizado correctamente' });
       } else {
         const videosId = input.videos_id ?? null;
-        if (!videosId || !input.file_url || !input.label) {
+        const cleanFileUrl = trimNullableUrl(input.file_url);
+        if (!videosId || !cleanFileUrl || !input.label) {
           sendJson(res, 400, { error: 'Faltan parámetros (videos_id, file_url, label)' });
           return;
         }
-        const [orders] = await plusmoviePool.query<RowDataPacket[]>(
-          'SELECT `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
+        const [existingRows] = await plusmoviePool.query<RowDataPacket[]>(
+          'SELECT video_file_id, file_url, `order` FROM video_file WHERE videos_id = ? ORDER BY `order` ASC',
           [videosId]
         );
-        let nextOrder = 1;
-        for (const row of orders) {
-          const current = Number(row.order ?? 0);
-          if (current < nextOrder) continue;
-          if (current === nextOrder) {
-            nextOrder++;
-            continue;
-          }
-          if (current > nextOrder) break;
+        const duplicateRow = findDuplicateUrlRow(existingRows, 'file_url', cleanFileUrl);
+        if (duplicateRow) {
+          sendJson(
+            res,
+            200,
+            buildDuplicateResponse({
+              video_file_id: String(duplicateRow.video_file_id),
+              order: Number(duplicateRow.order ?? 0),
+            })
+          );
+          return;
         }
+        const nextOrder = computeNextMissingOrder(existingRows.map((row) => Number(row.order ?? 0)));
         const streamKey = generateStreamKey(12);
         const [result] = await plusmoviePool.execute<ResultSetHeader>(
           'INSERT INTO video_file (stream_key, videos_id, file_source, source_type, file_url, label, `order`) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [streamKey, videosId, 'embed', 'link', input.file_url, input.label, nextOrder]
+          [streamKey, videosId, 'embed', 'link', cleanFileUrl, input.label, nextOrder]
         );
         sendJson(res, 200, {
           message: 'Registrado correctamente',
@@ -1183,6 +1243,18 @@ async function handleSeriesPlusmovie(req: IncomingMessage, res: ServerResponse, 
           sendJson(res, 400, { error: 'Faltan parámetros requeridos (seasons_id o videos_id) para el registro' });
           return;
         }
+        const cleanFileUrl = trimNullableUrl(input.file_url);
+        if (cleanFileUrl) {
+          const [existingRows] = await plusmoviePool.query<RowDataPacket[]>(
+            'SELECT episodes_id, file_url FROM episodes WHERE videos_id = ? AND seasons_id = ?',
+            [videosId, seasonsId]
+          );
+          const duplicateRow = findDuplicateUrlRow(existingRows, 'file_url', cleanFileUrl);
+          if (duplicateRow) {
+            sendJson(res, 200, buildDuplicateResponse({ episodes_id: String(duplicateRow.episodes_id) }));
+            return;
+          }
+        }
         const streamKey = generateStreamKey(12);
         const [result] = await plusmoviePool.execute<ResultSetHeader>(
           'INSERT INTO episodes (stream_key, videos_id, seasons_id, episodes_name, file_source, source_type, file_url, `order`, date_added, last_ep_added) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1193,7 +1265,7 @@ async function handleSeriesPlusmovie(req: IncomingMessage, res: ServerResponse, 
             input.episodes_name ?? null,
             input.file_source ?? 'embed',
             input.source_type ?? 'link',
-            input.file_url ?? null,
+            cleanFileUrl,
             input.order ?? null,
             currentDate,
             currentDate,
