@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# APIs PHP y credenciales locales (no subir a Git)
+apiweb/
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,4 +29,5 @@ dist-ssr
 *.sln
 *.sw?
 PELISPLUSHD_BZ_SCRAPE_SPEC.md
+public/app-streamnexus.apk
 apiweb
