@@ -8,8 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
+dist/**/*.map
+dist/app-streamnexus.apk
 *.local
 
 # APIs PHP y credenciales locales (no subir a Git)
@@ -30,4 +31,3 @@ apiweb/
 *.sw?
 PELISPLUSHD_BZ_SCRAPE_SPEC.md
 public/app-streamnexus.apk
-apiweb
